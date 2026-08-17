@@ -1,0 +1,31 @@
+themovie - what it does
+
+themovie is a subscription SaaS that takes a user from a written script to
+finished video clips using AI generation.
+
+Workflow:
+1. Script - user writes/pastes a script for a project, optionally has it
+   enhanced by an LLM (DeepSeek).
+2. Scene breakdown - AI breaks the script into scenes, extracting each
+   scene's script excerpt, duration, dialogue, and which characters/
+   locations/props appear in it.
+3. Characters - user defines reusable characters/locations/props ("assets"),
+   each with reference images, and can generate AI "character sheets" for
+   them.
+4. Images - generate freeform images or per-scene storyboard images
+   (text-to-image), referencing characters via @mentions, or upload their
+   own images.
+5. Videos - turn an image into a short video clip, or generate a
+   character-referenced video directly (image-to-video / text-to-video),
+   with configurable duration/resolution/aspect ratio.
+6. All Media - a combined, real-time-updating gallery of everything
+   generated or uploaded for a project.
+
+Billing: subscription plans with a credit balance; each generation spends
+credits (image = flat rate, video = scaled by duration/resolution). Backed
+by Stripe in production, with a mock billing mode for local dev.
+
+Under the hood: Next.js (App Router) + Supabase (Postgres/Auth/Realtime/
+Storage), AI image/video generation via BytePlus ModelArk (Seedream/
+Seedance), long-running video jobs run as durable background workflows
+(Vercel Workflow DevKit) so they survive retries/restarts.
