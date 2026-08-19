@@ -41,7 +41,11 @@ export async function updateSession(request: NextRequest) {
   // and redirected away from once logged in (see below) so authed users
   // land in the app instead of the logged-out marketing chrome.
   const isPublicMarketingRoute =
-    path === "/" || path.startsWith("/services") || path.startsWith("/pricing") || path.startsWith("/about");
+    path === "/" ||
+    path.startsWith("/services") ||
+    path.startsWith("/pricing") ||
+    path.startsWith("/about") ||
+    path.startsWith("/contact");
 
   if (!isAuthed && !isAuthRoute && !isAdminLoginRoute && !isPublicMarketingRoute) {
     const url = request.nextUrl.clone();

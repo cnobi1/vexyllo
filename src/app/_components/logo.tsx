@@ -5,8 +5,8 @@ export function Logo({ className = "h-7 w-auto" }: { className?: string }) {
     <Image
       src="/logo.png"
       alt="VeXyllo AI"
-      width={500}
-      height={180}
+      width={446}
+      height={154}
       priority
       className={className}
     />

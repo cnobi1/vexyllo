@@ -67,6 +67,7 @@ export async function signup(
 ): Promise<AuthState> {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
+  const idea = String(formData.get("idea") ?? "").trim();
 
   const supabase = await createClient();
   const { data, error } = await supabase.auth.signUp({
@@ -85,7 +86,39 @@ export async function signup(
     return { message: "Check your email to confirm your account before logging in." };
   }
 
+  // Carried over from the marketing homepage's hero prompt console — only
+  // reachable here when signup grants a session immediately (email
+  // confirmation off). If confirmation is required the idea is dropped;
+  // the user lands on an empty dashboard after confirming instead, same as
+  // any other signup.
+  if (idea && data.user) {
+    const { data: project } = await supabase
+      .from("projects")
+      .insert({ user_id: data.user.id, title: idea.slice(0, 60) })
+      .select("id")
+      .single();
+    if (project) {
+      redirect(`/projects/${project.id}?idea=${encodeURIComponent(idea)}`);
+    }
+  }
+
   redirect("/dashboard");
+}
+
+export async function signInWithGoogle() {
+  const supabase = await createClient();
+  const { data, error } = await supabase.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: `${SITE_URL}/auth/callback`,
+    },
+  });
+
+  if (error || !data.url) {
+    redirect(`/login?error=${encodeURIComponent(error?.message ?? "Could not start Google sign-in.")}`);
+  }
+
+  redirect(data.url);
 }
 
 export async function logout() {

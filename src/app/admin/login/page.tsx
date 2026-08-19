@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import Link from "next/link";
 import { adminLogin, type AuthState } from "@/lib/actions/auth";
 import { Logo } from "@/app/_components/logo";
 
@@ -16,7 +17,9 @@ export default function AdminLoginPage() {
         action={action}
         className="card-glow flex w-full max-w-sm flex-col gap-4 rounded-2xl p-8"
       >
-        <Logo className="h-7 w-auto self-start" />
+        <Link href="/" className="self-start">
+          <Logo className="h-9 w-auto" />
+        </Link>
         <h1 className="text-xl font-semibold text-foreground">Admin login</h1>
         <div className="flex flex-col gap-1">
           <label htmlFor="email" className="text-sm text-muted">

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { HeroImagePlaceholder, ImagePlaceholder } from "../_components/image-placeholder";
 
 export default function AboutPage() {
   return (
@@ -16,6 +17,20 @@ export default function AboutPage() {
             generate scene and character images, then turn stills into motion. No crew required.
           </p>
         </div>
+        <HeroImagePlaceholder
+          src="/marketing/about-hero-bg.jpg"
+          alt=""
+          prompt="Wide cinematic shot of a moody indie film pre-production desk at night: script pages, a lit storyboard sketch, and a laptop glowing with AI-generated scene art. Soft violet and indigo neon rim light, shallow depth of field, inspiring and a little mysterious, 21:9."
+        />
+      </section>
+
+      <section className="mx-auto w-full max-w-4xl px-6 pb-4">
+        <ImagePlaceholder
+          aspect="aspect-[21/9]"
+          src="/marketing/about-desk.jpg"
+          alt="Filmmaker sketching a storyboard panel beside a laptop"
+          prompt="Close-up, documentary-style shot of a filmmaker's hands sketching a storyboard panel next to a laptop displaying an AI-generated character sheet. Warm desk-lamp light mixed with cool violet monitor glow, shallow depth of field."
+        />
       </section>
 
       <section className="mx-auto grid w-full max-w-4xl grid-cols-1 gap-4 px-6 pb-20 sm:grid-cols-3">

@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { PLANS } from "@/lib/billing/plans";
 import { IMAGE_CREDIT_COST, videoCreditCost } from "@/lib/billing/credit-costs";
+import { HeroImagePlaceholder, ImagePlaceholder } from "../_components/image-placeholder";
 
 const CREDITS_PER_1080P_SECOND = videoCreditCost(1, "1080p");
 
@@ -43,6 +44,10 @@ export default function PricingPage() {
             you generate.
           </p>
         </div>
+        <HeroImagePlaceholder
+          src="/marketing/pricing-hero-bg.jpg"
+          prompt="Abstract dark background with softly glowing violet and indigo credit-token shapes made of light, floating in shallow depth of field, subtle film grain, minimal and premium."
+        />
       </section>
 
       <section className="mx-auto w-full max-w-5xl px-6 pb-8">
@@ -112,6 +117,16 @@ export default function PricingPage() {
       <p className="mx-auto w-full max-w-5xl px-6 pb-16 text-center text-xs text-muted-2">
         Prices in USD. Upgrade, downgrade, or cancel any time from your billing page.
       </p>
+
+      <section className="mx-auto w-full max-w-3xl px-6 pb-16">
+        <ImagePlaceholder
+          kind="video"
+          aspect="aspect-[21/9]"
+          src="/marketing/pricing-sample-clip.mp4"
+          alt="Sample rendered clip of a lighthouse keeper walking toward a glowing lighthouse at dusk"
+          prompt="A short sample clip: a lighthouse keeper walking toward a glowing lighthouse at dusk, warm-to-violet color grade, film-still quality, 16:9 — used to show what a finished credit-funded clip actually looks like."
+        />
+      </section>
 
       <section className="mx-auto w-full max-w-2xl px-6 pb-24">
         <h2 className="mb-6 text-center text-xl font-semibold text-foreground">Questions</h2>

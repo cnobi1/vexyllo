@@ -35,6 +35,41 @@ export async function createProject(formData: FormData) {
   redirect(`/projects/${data.id}`);
 }
 
+/**
+ * Entry point for the marketing homepage's hero prompt console. Deliberately
+ * doesn't call the LLM provider itself (that costs a credit and belongs to
+ * an explicit, logged-in action) — it only creates the project and carries
+ * the idea through as a `?idea=` query param, which the project page uses to
+ * prefill the existing "Write with AI" idea box so the user still takes the
+ * explicit generate step themselves.
+ */
+export async function startProjectFromIdea(formData: FormData) {
+  const idea = String(formData.get("idea") ?? "").trim();
+  if (!idea) return;
+
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) {
+    redirect(`/signup?idea=${encodeURIComponent(idea)}`);
+  }
+
+  const { data, error } = await supabase
+    .from("projects")
+    .insert({ user_id: user.id, title: idea.slice(0, 60) })
+    .select("id")
+    .single();
+
+  if (error || !data) {
+    throw new Error(error?.message ?? "Failed to create project");
+  }
+
+  revalidatePath("/dashboard");
+  redirect(`/projects/${data.id}?idea=${encodeURIComponent(idea)}`);
+}
+
 export async function updateProject(id: string, formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const scriptText = String(formData.get("script_text") ?? "");

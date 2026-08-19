@@ -13,10 +13,13 @@ import { ScriptTabs } from "./script-tabs";
 
 export default async function ProjectPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string }>;
+  searchParams: Promise<{ idea?: string }>;
 }) {
   const { id } = await params;
+  const { idea: ideaFromHero } = await searchParams;
 
   const supabase = await createClient();
   const { data: project } = await supabase
@@ -57,6 +60,7 @@ export default async function ProjectPage({
           name="idea"
           required
           rows={4}
+          defaultValue={ideaFromHero}
           placeholder="e.g. A lonely lighthouse keeper finds a message in a bottle that changes everything…"
           className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
         />
