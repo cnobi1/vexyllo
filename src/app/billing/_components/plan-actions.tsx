@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { unstable_rethrow } from "next/navigation";
 import { subscribe, cancelSubscription } from "@/lib/actions/billing";
 import type { PlanId } from "@/lib/billing/plans";
 
@@ -27,8 +28,13 @@ export function SubscribeButton({ planId, isCurrent }: { planId: PlanId; isCurre
             try {
               await subscribe(planId);
             } catch (err) {
-              // redirect() throws internally on success — only a genuine
-              // failure (e.g. no Stripe price configured) reaches here.
+              // redirect() throws internally on success (digest
+              // "NEXT_REDIRECT") — unstable_rethrow lets that specific
+              // throw continue on to Next's own navigation handling
+              // instead of being swallowed here as a fake error. Only a
+              // genuine failure (e.g. no Stripe price configured) reaches
+              // setError below.
+              unstable_rethrow(err);
               setError(err instanceof Error ? err.message : "Failed to start checkout");
             }
           });
