@@ -3,8 +3,10 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getBillingProvider } from "@/lib/providers/billing";
 import { PLANS, isPlanId } from "@/lib/billing/plans";
+import { BILLING_FAQS } from "@/lib/billing/faqs";
 import { SubscribeButton, CancelButton } from "./_components/plan-actions";
 import { Logo } from "../_components/logo";
+import { PlanCard } from "../_components/plan-card";
 
 const STATUS_STYLE: Record<string, string> = {
   active: "border-success/30 bg-success/10 text-success",
@@ -44,12 +46,20 @@ export default async function BillingPage() {
         </Link>
       </header>
 
-      <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-10 px-6 py-14">
-        <div className="flex flex-col gap-2">
-          <h2 className="text-2xl font-bold">Billing</h2>
-          <p className="text-sm text-muted">Manage your subscription and credit balance.</p>
+      <section className="relative overflow-hidden">
+        <div className="hero-glow" aria-hidden="true" />
+        <div className="relative mx-auto flex w-full max-w-2xl flex-col items-center gap-4 px-6 py-16 text-center sm:py-20">
+          <h1 className="text-4xl font-bold sm:text-5xl">
+            Simple, <span className="gradient-text">credit-based</span> pricing
+          </h1>
+          <p className="max-w-lg text-sm text-muted sm:text-base">
+            One plan, one credit balance, no per-generation invoices. Pick the plan that matches how much
+            you generate.
+          </p>
         </div>
+      </section>
 
+      <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-10 px-6 pb-24">
         {isDemo && (
           <div className="rounded-2xl border border-warning/30 bg-warning/10 px-5 py-4 text-sm text-warning">
             <span className="font-semibold">Demo mode.</span> No Stripe account is connected yet, so subscribing
@@ -61,7 +71,7 @@ export default async function BillingPage() {
         )}
 
         <section className="card-glow flex flex-col gap-4 rounded-2xl p-6">
-          <h3 className="text-base font-semibold text-foreground">Current plan</h3>
+          <h2 className="text-base font-semibold text-foreground">Current plan</h2>
           {subscription ? (
             <div className="flex flex-wrap items-center gap-3">
               <span className="text-lg font-semibold capitalize text-foreground">{subscription.plan}</span>
@@ -101,20 +111,32 @@ export default async function BillingPage() {
           )}
         </section>
 
-        <section className="flex flex-col gap-4">
-          <h3 className="text-base font-semibold text-foreground">Plans</h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            {PLANS.map((plan) => (
-              <div key={plan.id} className="card-glow flex flex-col gap-4 rounded-2xl p-5">
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-medium text-muted">{plan.name}</span>
-                  <span className="text-2xl font-bold text-foreground">
-                    ${plan.priceUsd}
-                    <span className="text-sm font-normal text-muted">/mo</span>
-                  </span>
-                  <span className="text-sm text-muted">{plan.monthlyCredits} credits / month</span>
-                </div>
-                <SubscribeButton planId={plan.id} isCurrent={currentPlanId === plan.id} />
+        <section className="flex flex-col gap-6">
+          <h2 className="text-base font-semibold text-foreground">Plans</h2>
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 sm:items-start">
+            {PLANS.map((plan) => {
+              const variant = plan.id === "pro" ? "featured" : plan.id === "studio" ? "top" : "default";
+              return (
+                <PlanCard
+                  key={plan.id}
+                  plan={plan}
+                  cta={<SubscribeButton planId={plan.id} isCurrent={currentPlanId === plan.id} variant={variant} />}
+                />
+              );
+            })}
+          </div>
+          <p className="text-center text-xs text-muted-2">
+            Prices in USD. Upgrade, downgrade, or cancel any time — it takes effect on your next renewal.
+          </p>
+        </section>
+
+        <section className="mx-auto w-full max-w-2xl">
+          <h2 className="mb-6 text-center text-xl font-semibold text-foreground">Questions</h2>
+          <div className="flex flex-col gap-4">
+            {BILLING_FAQS.map((faq) => (
+              <div key={faq.question} className="card-glow rounded-2xl p-5">
+                <h3 className="text-sm font-semibold text-foreground">{faq.question}</h3>
+                <p className="mt-1 text-sm text-muted">{faq.answer}</p>
               </div>
             ))}
           </div>

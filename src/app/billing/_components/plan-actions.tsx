@@ -5,13 +5,31 @@ import { unstable_rethrow } from "next/navigation";
 import { subscribe, cancelSubscription } from "@/lib/actions/billing";
 import type { PlanId } from "@/lib/billing/plans";
 
-export function SubscribeButton({ planId, isCurrent }: { planId: PlanId; isCurrent: boolean }) {
+// Mirrors the CTA color logic on /pricing (featured/top-tier/default) so a
+// plan's call-to-action reads the same whether the visitor is logged in or
+// not.
+const VARIANT_CLASS = {
+  featured: "btn-primary",
+  top: "bg-primary-2 text-white transition-colors hover:brightness-110",
+  default:
+    "border border-border text-foreground transition-colors hover:border-border-strong hover:bg-surface-hover",
+} as const;
+
+export function SubscribeButton({
+  planId,
+  isCurrent,
+  variant = "default",
+}: {
+  planId: PlanId;
+  isCurrent: boolean;
+  variant?: keyof typeof VARIANT_CLASS;
+}) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   if (isCurrent) {
     return (
-      <span className="btn-primary block rounded-full px-4 py-2 text-center text-sm font-medium text-white opacity-60">
+      <span className="btn-primary block rounded-full px-5 py-3 text-center text-sm font-semibold text-white opacity-60">
         Current plan
       </span>
     );
@@ -39,7 +57,7 @@ export function SubscribeButton({ planId, isCurrent }: { planId: PlanId; isCurre
             }
           });
         }}
-        className="btn-primary block w-full rounded-full px-4 py-2 text-center text-sm font-medium text-white disabled:opacity-50"
+        className={`block w-full rounded-full px-5 py-3 text-center text-sm font-semibold disabled:opacity-50 ${VARIANT_CLASS[variant]}`}
       >
         {isPending ? "Redirecting…" : "Subscribe"}
       </button>
