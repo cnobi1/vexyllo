@@ -119,6 +119,7 @@ export async function requestPasswordReset(
   // Same message whether or not the email is registered — don't let this
   // form be used to enumerate accounts.
   if (error) {
+    console.error("requestPasswordReset failed:", error);
     return { error: error.message };
   }
   return { message: "If an account exists for that email, we've sent a password reset link." };
