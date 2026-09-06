@@ -6,7 +6,11 @@ export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
   const token_hash = searchParams.get("token_hash");
   const type = searchParams.get("type") as EmailOtpType | null;
-  const next = searchParams.get("next") ?? "/dashboard";
+  // A recovery link must always land on the reset-password page — never
+  // trust `next` for this type, since it comes from the email template
+  // and getting it wrong would drop the user on /dashboard mid-recovery
+  // with no way to actually set their new password.
+  const next = type === "recovery" ? "/reset-password" : (searchParams.get("next") ?? "/dashboard");
 
   if (token_hash && type) {
     const supabase = await createClient();

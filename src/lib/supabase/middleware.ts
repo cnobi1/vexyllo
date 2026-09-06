@@ -31,7 +31,12 @@ export async function updateSession(request: NextRequest) {
   const isAuthed = !!data?.claims;
 
   const path = request.nextUrl.pathname;
-  const isAuthRoute = path.startsWith("/login") || path.startsWith("/signup") || path.startsWith("/auth");
+  const isAuthRoute =
+    path.startsWith("/login") ||
+    path.startsWith("/signup") ||
+    path.startsWith("/auth") ||
+    path.startsWith("/forgot-password") ||
+    path.startsWith("/reset-password");
   // Admin has its own separate login (src/app/admin/login/), distinct from
   // the regular /login — checked before isAdminRoute below so an
   // unauthenticated visit to /admin/login itself isn't redirected away.
