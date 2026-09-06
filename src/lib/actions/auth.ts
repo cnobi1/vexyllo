@@ -1,9 +1,12 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export type AuthState = { error?: string; message?: string } | undefined;
 
@@ -111,18 +114,48 @@ export async function requestPasswordReset(
 ): Promise<AuthState> {
   const email = String(formData.get("email") ?? "");
 
-  const supabase = await createClient();
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${SITE_URL}/auth/confirm?next=/reset-password`,
+  // Same message whether or not the email is registered, whether the
+  // account lookup fails, or whether the send fails — don't let this form
+  // be used to enumerate accounts, and don't surface delivery errors to an
+  // unauthenticated caller.
+  const genericState: AuthState = {
+    message: "If an account exists for that email, we've sent a password reset link.",
+  };
+
+  // Bypasses Supabase Auth's own resetPasswordForEmail (which renders and
+  // sends the email itself via GoTrue's mailer/email template) in favor of
+  // generating the recovery token via the Admin API and sending the email
+  // ourselves through Resend — GoTrue's own send was failing in production
+  // with an opaque 500 from its mail step, unrelated to this app's code.
+  // admin.generateLink requires the service-role client; this is safe here
+  // per src/lib/supabase/service.ts's documented exception, since it's a
+  // privileged Auth-admin operation with no RLS policy of its own to bypass.
+  const supabase = createServiceClient();
+  const { data, error } = await supabase.auth.admin.generateLink({
+    type: "recovery",
+    email,
+    options: { redirectTo: `${SITE_URL}/auth/confirm?next=/reset-password` },
   });
 
-  // Same message whether or not the email is registered — don't let this
-  // form be used to enumerate accounts.
-  if (error) {
-    console.error("requestPasswordReset failed:", error);
-    return { error: error.message };
+  if (error || !data.properties) {
+    if (error) console.error("requestPasswordReset: generateLink failed:", error);
+    return genericState;
   }
-  return { message: "If an account exists for that email, we've sent a password reset link." };
+
+  const resetUrl = `${SITE_URL}/auth/confirm?token_hash=${data.properties.hashed_token}&type=recovery&next=/reset-password`;
+
+  const { error: sendError } = await resend.emails.send({
+    from: "VeXyllo AI <noreply@vexyllo.com>",
+    to: [email],
+    subject: "Reset your VeXyllo AI password",
+    html: `<p>We received a request to reset your VeXyllo AI password.</p><p><a href="${resetUrl}">Reset your password</a></p><p>If you didn't request this, you can safely ignore this email.</p>`,
+  });
+
+  if (sendError) {
+    console.error("requestPasswordReset: email send failed:", sendError);
+  }
+
+  return genericState;
 }
 
 export async function resetPassword(
