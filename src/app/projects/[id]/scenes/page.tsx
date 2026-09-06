@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { generateSceneBreakdown } from "@/lib/actions/scenes";
 import { GenerateButton } from "./submit-button";
@@ -17,13 +18,15 @@ export default async function ScenesPage({
   const supabase = await createClient();
   const { data: project } = await supabase
     .from("projects")
-    .select("id, target_scene_duration_seconds")
+    .select("id, script_text, target_scene_duration_seconds")
     .eq("id", id)
     .single();
 
   if (!project) {
     notFound();
   }
+
+  const hasScript = Boolean(project.script_text?.trim());
 
   // Secondary order needed: Postgres doesn't guarantee stable row order among
   // ties on `type` alone — without it, this list (and the asset chips built
@@ -75,27 +78,43 @@ export default async function ScenesPage({
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-6 py-10">
-      <form action={generateSceneBreakdownWithId} className="card-glow flex flex-col gap-3 rounded-2xl p-6">
-        <h2 className="text-base font-semibold text-foreground">Generate Scenes</h2>
-        <p className="text-sm text-muted">
-          {hasScenes
-            ? "Regenerating replaces the current scene breakdown with a fresh one from the script. Existing characters, locations, and props are matched by name and keep their reference images — only ones no longer in the script are removed."
-            : "Break this project's script down into a scene-by-scene breakdown sheet: each scene's full text, estimated screen time, and the characters (with wardrobe notes), locations, and props it contains."}
-        </p>
-        <label className="flex items-center gap-2 text-sm text-muted">
-          Max scene duration
-          <input
-            type="number"
-            name="targetSceneDurationSeconds"
-            min={1}
-            defaultValue={project.target_scene_duration_seconds ?? ""}
-            placeholder="No max"
-            className="w-20 rounded-lg border border-border bg-background/60 px-2 py-1 text-sm text-foreground outline-none focus:border-border-strong"
-          />
-          seconds (optional)
-        </label>
-        <GenerateButton hasScenes={hasScenes} />
-      </form>
+      {hasScript ? (
+        <form action={generateSceneBreakdownWithId} className="card-glow flex flex-col gap-3 rounded-2xl p-6">
+          <h2 className="text-base font-semibold text-foreground">Generate Scenes</h2>
+          <p className="text-sm text-muted">
+            {hasScenes
+              ? "Regenerating replaces the current scene breakdown with a fresh one from the script. Existing characters, locations, and props are matched by name and keep their reference images — only ones no longer in the script are removed."
+              : "Break this project's script down into a scene-by-scene breakdown sheet: each scene's full text, estimated screen time, and the characters (with wardrobe notes), locations, and props it contains."}
+          </p>
+          <label className="flex items-center gap-2 text-sm text-muted">
+            Max scene duration
+            <input
+              type="number"
+              name="targetSceneDurationSeconds"
+              min={1}
+              defaultValue={project.target_scene_duration_seconds ?? ""}
+              placeholder="No max"
+              className="w-20 rounded-lg border border-border bg-background/60 px-2 py-1 text-sm text-foreground outline-none focus:border-border-strong"
+            />
+            seconds (optional)
+          </label>
+          <GenerateButton hasScenes={hasScenes} />
+        </form>
+      ) : (
+        <div className="card-glow flex flex-col gap-3 rounded-2xl p-6">
+          <h2 className="text-base font-semibold text-foreground">Generate Scenes</h2>
+          <p className="text-sm text-muted">
+            This project doesn&apos;t have a script yet. Add one on the Script tab before generating a scene
+            breakdown.
+          </p>
+          <Link
+            href={`/projects/${id}`}
+            className="btn-primary self-start rounded-full px-5 py-2 text-sm font-medium text-white"
+          >
+            Go to Script
+          </Link>
+        </div>
+      )}
 
       <SceneTabs
         defaultTab="scenes"
