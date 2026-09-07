@@ -71,7 +71,8 @@ export function ProjectShell({
   );
 
   return (
-    <div className="flex flex-1 flex-col md:flex-row">
+    <div className="relative flex flex-1 flex-col md:flex-row">
+      <div className="hero-glow" aria-hidden="true" />
       <div className="flex items-center gap-3 border-b border-border bg-surface/40 px-4 py-3 md:hidden">
         <button
           type="button"
