@@ -9,6 +9,7 @@ import {
 } from "@/lib/actions/projects";
 import { SubmitButton } from "./_components/submit-button";
 import { ScriptEditor } from "./_components/script-editor";
+import { EnhanceScriptForm } from "./_components/enhance-script-form";
 import { ScriptTabs } from "./script-tabs";
 
 export default async function ProjectPage({
@@ -86,56 +87,7 @@ export default async function ProjectPage({
     </form>
   );
 
-  const enhancePanel = (
-    <form
-      action={enhanceScriptFromUploadWithId}
-      className="card-glow flex flex-col gap-3 rounded-2xl p-6"
-    >
-      <h2 className="text-base font-semibold text-foreground">Upload &amp; Enhance</h2>
-      <p className="text-sm text-muted">
-        Already have a script? Upload it or paste it in, and the agent will punch up
-        dialogue, tighten pacing, and fix formatting — without changing your story. Your
-        original stays recoverable from the Edit tab.
-      </p>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="file" className="text-sm text-muted">
-          Script file
-        </label>
-        <input
-          id="file"
-          name="file"
-          type="file"
-          accept=".txt,.fountain,.pdf,.docx"
-          className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground outline-none file:mr-3 file:rounded-full file:border-0 file:bg-primary/15 file:px-3 file:py-1 file:text-sm file:font-medium file:text-foreground focus:border-border-strong"
-        />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="pasted_script" className="text-sm text-muted">
-          Or paste your script
-        </label>
-        <textarea
-          id="pasted_script"
-          name="pasted_script"
-          rows={8}
-          placeholder="Paste your script text here instead of uploading a file…"
-          className="rounded-lg border border-border bg-background/60 px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
-        />
-      </div>
-      <div className="flex flex-col gap-1">
-        <label htmlFor="instructions" className="text-sm text-muted">
-          What should the agent focus on? (optional)
-        </label>
-        <textarea
-          id="instructions"
-          name="instructions"
-          rows={2}
-          placeholder="e.g. Tighten the pacing in Act 2, make the dialogue punchier…"
-          className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
-        />
-      </div>
-      <SubmitButton label="✦ Enhance Script" pendingLabel="Enhancing…" />
-    </form>
-  );
+  const enhancePanel = <EnhanceScriptForm action={enhanceScriptFromUploadWithId} />;
 
   const editPanel = (
     <div className="flex flex-col gap-3">
