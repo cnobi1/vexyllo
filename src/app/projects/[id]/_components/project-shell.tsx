@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type ReactNode } from "react";
+import { logout } from "@/lib/actions/auth";
 import { SideNav } from "./side-nav";
 
 function HamburgerIcon() {
@@ -19,14 +20,11 @@ function CloseIcon() {
   );
 }
 
-function DeleteIcon() {
+function LogoutIcon() {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className="h-[18px] w-[18px] shrink-0">
-      <path
-        d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2m-8 0 1 13a1 1 0 0 0 1 1h6a1 1 0 0 0 1-1l1-13"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
+      <path d="M9 21H5a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h4" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M16 17l5-5-5-5M21 12H9" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -37,7 +35,6 @@ export function ProjectShell({
   style,
   userId,
   creditBalance,
-  deleteAction,
   children,
 }: {
   projectId: string;
@@ -45,7 +42,6 @@ export function ProjectShell({
   style: string | null;
   userId: string;
   creditBalance: number | null;
-  deleteAction: () => Promise<void>;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -62,13 +58,13 @@ export function ProjectShell({
           onNavigate={onNavigate}
         />
       </div>
-      <form action={deleteAction} className="border-t border-border p-3">
+      <form action={logout} className="border-t border-border p-3">
         <button
           type="submit"
-          className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium text-danger transition-colors hover:bg-danger/10"
+          className="flex w-full items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
         >
-          <DeleteIcon />
-          Delete project
+          <LogoutIcon />
+          Log out
         </button>
       </form>
     </div>

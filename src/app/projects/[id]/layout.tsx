@@ -1,6 +1,5 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { deleteProject } from "@/lib/actions/projects";
 import { ProjectShell } from "./_components/project-shell";
 
 export default async function ProjectLayout({
@@ -29,8 +28,6 @@ export default async function ProjectLayout({
     ? await supabase.from("subscriptions").select("credit_balance").eq("user_id", user.id).maybeSingle()
     : { data: null };
 
-  const deleteProjectWithId = deleteProject.bind(null, project.id);
-
   return (
     <ProjectShell
       projectId={project.id}
@@ -38,7 +35,6 @@ export default async function ProjectLayout({
       style={project.style}
       userId={user?.id ?? ""}
       creditBalance={subscription?.credit_balance ?? null}
-      deleteAction={deleteProjectWithId}
     >
       {children}
     </ProjectShell>
