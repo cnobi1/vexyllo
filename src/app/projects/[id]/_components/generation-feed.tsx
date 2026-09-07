@@ -1,12 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { deleteGeneration } from "@/lib/actions/media";
 import { ConfirmDialog } from "../../../_components/confirm-dialog";
 import { MediaGrid, type MediaGridItem } from "./media-grid";
 
 type Row = MediaGridItem & { kind: string; asset_id?: string | null; created_at: string };
+
+// generations.status only ever moves pending -> succeeded/failed (DB check
+// constraint), so "still in progress" always means status === "pending" —
+// no separate "generating" value exists at this column.
+const PENDING_POLL_INTERVAL_MS = 10_000;
 
 /**
  * Realtime-subscribed grid for any project-scoped generation kind(s)
@@ -42,6 +47,10 @@ export function GenerationFeed({
   const [items, setItems] = useState(initialItems);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+  const itemsRef = useRef(items);
+  useEffect(() => {
+    itemsRef.current = items;
+  }, [items]);
 
   useEffect(() => {
     const supabase = createClient();
@@ -98,6 +107,39 @@ export function GenerationFeed({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- kinds/type/assetId are effectively static per-page, re-subscribing on identity churn is unnecessary
   }, [projectId]);
+
+  // Fallback for a realtime event that never arrives — none of this app's
+  // postgres_changes subscriptions detect or recover from a dropped/expired
+  // WebSocket (no status callback on .subscribe(), no reconnect logic), so a
+  // channel that silently dies mid-generation leaves the UI stuck showing
+  // "pending" forever with no error. This mainly bites video generation:
+  // it runs for minutes via a durable Workflow, which is long enough for a
+  // background-tab-throttled or idle-timed-out connection to miss the
+  // terminal update, whereas near-instant image generations rarely outlive
+  // a fresh connection. Rather than trying to reproduce/diagnose the exact
+  // disconnect (browser throttling, network blip, server-side idle
+  // timeout — any of which could be the actual cause on a given run),
+  // directly re-querying still-pending rows on an interval guarantees the
+  // UI self-heals regardless of why realtime missed it.
+  useEffect(() => {
+    const supabase = createClient();
+    const interval = setInterval(async () => {
+      const pendingIds = itemsRef.current.filter((item) => item.status === "pending").map((item) => item.id);
+      if (pendingIds.length === 0) return;
+      const { data } = await supabase
+        .from("generations")
+        .select("id, status, output_url, storage_path, error")
+        .in("id", pendingIds);
+      if (!data || data.length === 0) return;
+      setItems((prev) =>
+        prev.map((item) => {
+          const fresh = data.find((row) => row.id === item.id);
+          return fresh ? { ...item, ...fresh } : item;
+        }),
+      );
+    }, PENDING_POLL_INTERVAL_MS);
+    return () => clearInterval(interval);
+  }, []);
 
   async function confirmDelete() {
     const id = confirmDeleteId;
