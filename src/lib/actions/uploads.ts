@@ -3,9 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { extFromContentType } from "@/lib/media/copy-to-storage";
+import { MAX_UPLOAD_BYTES } from "@/lib/media/upload-limits";
 import { loadOwnedProject } from "./project-guard";
-
-const MAX_UPLOAD_BYTES = 10 * 1024 * 1024;
 
 /**
  * Returns the uploaded image's URL directly to the caller rather than
