@@ -7,6 +7,7 @@ import { SceneList } from "./scene-list";
 import { SceneTabs } from "./scene-tabs";
 import { AssetsList } from "./assets-list";
 import { resolveAssetImageUrlMap } from "@/lib/media/asset-references";
+import type { CharacterOption } from "../_components/character-picker";
 
 export default async function ScenesPage({
   params,
@@ -50,6 +51,12 @@ export default async function ScenesPage({
       { name: asset.name, type: asset.type, imageUrl: imageUrlByAsset[asset.id] ?? null },
     ]),
   );
+
+  const assetOptions: CharacterOption[] = (assets ?? []).map((asset) => ({
+    id: asset.id,
+    name: asset.name,
+    referenceImageUrl: imageUrlByAsset[asset.id] ?? null,
+  }));
 
   // Fetched once for the whole project (rather than one query per card) and
   // grouped client-side below — feeds each AssetCard's inline generate
@@ -134,7 +141,7 @@ export default async function ScenesPage({
         }
         scenes={
           scenes && scenes.length > 0 ? (
-            <SceneList scenes={scenes} assetsById={assetsById} />
+            <SceneList scenes={scenes} assetsById={assetsById} projectId={id} assetOptions={assetOptions} />
           ) : (
             <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted">
               No scenes yet — generate scenes from your script first.

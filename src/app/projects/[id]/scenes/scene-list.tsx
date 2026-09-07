@@ -1,5 +1,7 @@
 import { Fragment } from "react";
 import { isHighlightedScriptLine } from "@/lib/script-highlight";
+import type { CharacterOption } from "../_components/character-picker";
+import { SceneAssetEditor } from "./scene-asset-editor";
 
 type SceneAssetLink = {
   asset_id: string;
@@ -30,22 +32,55 @@ function formatDuration(seconds: number | null) {
  * The scene breakdown sheet: one card per scene with its verbatim script
  * text, estimated screen time, and the characters/locations/props that
  * appear in it — a character chip also shows its wardrobe note for that
- * scene when the breakdown extracted one. Purely informational — no
- * generation lives here; that's deferred to a future rebuild.
+ * scene when the breakdown extracted one. Each card also lets you manually
+ * add/remove which characters/locations/props are linked to it
+ * (scene_assets), to correct the AI breakdown's picks — collapsed behind
+ * an "Edit assets" toggle, keeping the default view read-only. No
+ * generation lives here directly; that's deferred to a future rebuild, but
+ * these links are what the Videos tab's "From scene" mode reads.
  */
-export function SceneList({ scenes, assetsById }: { scenes: Scene[]; assetsById: Record<string, AssetInfo> }) {
+export function SceneList({
+  scenes,
+  assetsById,
+  projectId,
+  assetOptions,
+}: {
+  scenes: Scene[];
+  assetsById: Record<string, AssetInfo>;
+  projectId: string;
+  assetOptions: CharacterOption[];
+}) {
   return (
     <section className="flex flex-col gap-4">
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {scenes.map((scene, index) => (
-          <SceneCard key={scene.id} scene={scene} index={index} assetsById={assetsById} />
+          <SceneCard
+            key={scene.id}
+            scene={scene}
+            index={index}
+            assetsById={assetsById}
+            projectId={projectId}
+            assetOptions={assetOptions}
+          />
         ))}
       </div>
     </section>
   );
 }
 
-function SceneCard({ scene, index, assetsById }: { scene: Scene; index: number; assetsById: Record<string, AssetInfo> }) {
+function SceneCard({
+  scene,
+  index,
+  assetsById,
+  projectId,
+  assetOptions,
+}: {
+  scene: Scene;
+  index: number;
+  assetsById: Record<string, AssetInfo>;
+  projectId: string;
+  assetOptions: CharacterOption[];
+}) {
   const duration = formatDuration(scene.duration_seconds);
   const lines = (scene.script_text ?? "").split("\n");
 
@@ -84,6 +119,13 @@ function SceneCard({ scene, index, assetsById }: { scene: Scene; index: number; 
           })}
         </div>
       )}
+
+      <SceneAssetEditor
+        projectId={projectId}
+        sceneId={scene.id}
+        assets={assetOptions}
+        initialSelectedIds={scene.scene_assets.map((link) => link.asset_id)}
+      />
 
       {scene.script_text && (
         <details className="rounded-lg border border-border">

@@ -196,3 +196,84 @@ export async function generateSceneBreakdown(projectId: string, formData: FormDa
   revalidatePath(`/projects/${projectId}/scenes`);
   redirect(`/projects/${projectId}/scenes`);
 }
+
+/**
+ * Manual override for the AI breakdown's asset picks — it sometimes misses
+ * or wrongly assigns a character/location/prop to a scene. This is what
+ * the Videos tab's "From scene" mode actually reads at generation time
+ * (resolved live, not baked into any stored prompt), so fixing scene_assets
+ * here directly fixes which reference images that scene's video generation
+ * uses.
+ */
+export async function addSceneAsset(projectId: string, sceneId: string, assetId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", projectId)
+    .single();
+  if (projectError || !project) {
+    throw new Error(projectError?.message ?? "Project not found");
+  }
+
+  // scene_assets_insert_own only checks scene_id -> scenes -> projects.user_id,
+  // not that asset_id belongs to the same project — verify both explicitly
+  // so a scene in one project can't get linked to another project's asset.
+  const { data: scene, error: sceneError } = await supabase
+    .from("scenes")
+    .select("id")
+    .eq("id", sceneId)
+    .eq("project_id", projectId)
+    .single();
+  if (sceneError || !scene) {
+    throw new Error(sceneError?.message ?? "Scene not found");
+  }
+
+  const { data: asset, error: assetError } = await supabase
+    .from("assets")
+    .select("id")
+    .eq("id", assetId)
+    .eq("project_id", projectId)
+    .single();
+  if (assetError || !asset) {
+    throw new Error(assetError?.message ?? "Asset not found");
+  }
+
+  const { error } = await supabase
+    .from("scene_assets")
+    .upsert({ scene_id: sceneId, asset_id: assetId }, { onConflict: "scene_id,asset_id", ignoreDuplicates: true });
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/projects/${projectId}/scenes`);
+}
+
+export async function removeSceneAsset(projectId: string, sceneId: string, assetId: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", projectId)
+    .single();
+  if (projectError || !project) {
+    throw new Error(projectError?.message ?? "Project not found");
+  }
+
+  const { error } = await supabase.from("scene_assets").delete().eq("scene_id", sceneId).eq("asset_id", assetId);
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/projects/${projectId}/scenes`);
+}
