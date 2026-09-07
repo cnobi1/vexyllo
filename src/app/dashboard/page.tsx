@@ -95,8 +95,8 @@ export default async function DashboardPage() {
           </div>
         </header>
 
-        <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-10 px-6 py-14">
-          <div className="flex flex-col gap-2 text-center">
+        <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-10 px-6 py-14">
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 text-center">
             <h2 className="text-3xl font-bold sm:text-4xl">
               Welcome back{firstName ? `, ${firstName}` : ""}
             </h2>
@@ -105,7 +105,7 @@ export default async function DashboardPage() {
 
           <form
             action={createProject}
-            className="card-glow relative flex flex-col gap-3 overflow-hidden rounded-2xl p-6"
+            className="card-glow relative mx-auto flex w-full max-w-3xl flex-col gap-3 overflow-hidden rounded-2xl p-6"
           >
             <div className="card-spotlight" aria-hidden="true" />
             <div className="relative flex flex-col gap-3">
@@ -134,7 +134,7 @@ export default async function DashboardPage() {
           <section className="flex flex-col gap-4">
             <h2 className="text-base font-semibold text-foreground">Your projects</h2>
             {projects && projects.length > 0 ? (
-              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                 {projects.map((project) => {
                   const thumbnail = thumbnailByProject.get(project.id);
                   return (
@@ -173,7 +173,7 @@ export default async function DashboardPage() {
                 })}
               </ul>
             ) : (
-              <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted">
+              <p className="mx-auto w-full max-w-3xl rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted">
                 No projects yet — create your first one above.
               </p>
             )}
