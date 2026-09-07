@@ -2,8 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { updateProjectStyle } from "@/lib/actions/projects";
-
-const PRESET_STYLES = ["3D-Animation", "Charcoal", "Claymation", "Concept-Sketch", "Realistic"];
+import { PRESET_STYLES } from "@/lib/project-styles";
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (

@@ -3,6 +3,7 @@
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { CUSTOM_STYLE_VALUE } from "@/lib/project-styles";
 import { getScriptProvider } from "@/lib/providers/llm";
 import { extractScriptText } from "@/lib/scripts/extract-script-text";
 import { normalizeScriptText } from "@/lib/scripts/normalize-script-text";
@@ -15,6 +16,9 @@ export async function createProject(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return;
 
+  const rawStyle = String(formData.get("style") ?? "").trim();
+  const style = rawStyle === CUSTOM_STYLE_VALUE ? String(formData.get("customStyle") ?? "").trim() : rawStyle;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -23,7 +27,7 @@ export async function createProject(formData: FormData) {
 
   const { data, error } = await supabase
     .from("projects")
-    .insert({ user_id: user.id, title })
+    .insert({ user_id: user.id, title, style: style || null })
     .select("id")
     .single();
 

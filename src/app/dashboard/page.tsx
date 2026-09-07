@@ -7,6 +7,7 @@ import { Logo } from "../_components/logo";
 import { SparkleIcon } from "../_components/sparkle-icon";
 import { CreditBadge } from "./_components/credit-badge";
 import { UserMenu } from "./_components/user-menu";
+import { NewProjectStyleField } from "./_components/new-project-style-field";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
@@ -121,6 +122,7 @@ export default async function DashboardPage() {
                 required
                 className="rounded-lg border border-border bg-background/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
               />
+              <NewProjectStyleField />
               <button
                 type="submit"
                 className="btn-primary flex w-fit items-center gap-1.5 rounded-full px-5 py-2 text-sm font-medium text-white"
