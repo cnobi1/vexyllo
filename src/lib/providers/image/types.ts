@@ -7,6 +7,8 @@ export interface GenerateImageInput {
   quantity?: number;
   /** Aspect ratio hint ("16:9"/"9:16"/"1:1"). Each adapter translates this into whatever its own API expects (BytePlus wants pixel "<width>x<height>"; Google wants the ratio token as-is). Omit to let the model infer from the prompt. */
   ratio?: string;
+  /** Provider-facing model id string (generation_models.provider_model_id) — which model to call within whichever adapter getImageProvider(providerKey) selected. */
+  modelId: string;
 }
 
 export interface GeneratedImage {

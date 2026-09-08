@@ -1,17 +1,27 @@
 "use client";
 
-const OPTIONS = [
+const DEFAULT_OPTIONS = [
   { value: "480p", label: "480p" },
   { value: "720p", label: "720p" },
   { value: "1080p", label: "1080p" },
 ] as const;
 
-export function ResolutionControl({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+/** `options` lets the selected model's own allowedResolutions (see generation_models) narrow the choices — omit to fall back to the historical fixed set. */
+export function ResolutionControl({
+  value,
+  onChange,
+  options,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  options?: string[] | null;
+}) {
+  const resolvedOptions = options?.length ? options.map((value) => ({ value, label: value })) : DEFAULT_OPTIONS;
   return (
     <div className="flex items-center gap-2">
       <span className="text-sm text-muted">Resolution</span>
       <div className="flex items-center gap-1">
-        {OPTIONS.map((option) => (
+        {resolvedOptions.map((option) => (
           <button
             key={option.value}
             type="button"

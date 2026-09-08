@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resolveAssetImageUrlMap } from "@/lib/media/asset-references";
-import { getVideoModelLimits } from "@/lib/providers/byteplus/model-limits";
+import { loadModelOptions } from "@/lib/billing/resolve-model";
 import { VideoGenerateForm } from "./video-generate-form";
 import { GenerationFeed } from "../_components/generation-feed";
 import type { MentionAssetOption } from "../_components/prompt-mention-field";
@@ -141,7 +141,7 @@ export default async function VideosPage({ params }: { params: Promise<{ id: str
     assets: scene.scene_assets,
   }));
 
-  const limits = getVideoModelLimits(process.env.BYTEPLUS_VIDEO_MODEL);
+  const videoModels = await loadModelOptions(supabase, "video");
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-6 py-10">
@@ -161,8 +161,7 @@ export default async function VideosPage({ params }: { params: Promise<{ id: str
         sceneStoryboardUrls={sceneStoryboardUrls}
         sceneStoryboardRatios={sceneStoryboardRatios}
         assetOptions={assetOptions}
-        minDuration={limits.minDurationSeconds}
-        maxDuration={limits.maxDurationSeconds}
+        videoModels={videoModels}
       />
       <GenerationFeed
         projectId={id}

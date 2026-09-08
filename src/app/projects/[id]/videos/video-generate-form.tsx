@@ -3,12 +3,13 @@
 import { Fragment, useMemo, useState, useTransition, type ChangeEvent, type FormEvent } from "react";
 import { generateVideoFromImage } from "@/lib/actions/media";
 import { uploadImage } from "@/lib/actions/uploads";
-import { videoCreditCost } from "@/lib/billing/credit-costs";
+import { computeCreditCost } from "@/lib/billing/credit-costs";
 import { isHighlightedScriptLine } from "@/lib/script-highlight";
 import { DurationControl } from "../_components/duration-control";
 import { RatioControl } from "../_components/ratio-control";
 import { ResolutionControl } from "../_components/resolution-control";
 import { QuantityControl } from "../_components/quantity-control";
+import { ModelSelectControl, type ModelOption } from "../_components/model-select-control";
 import { GenerationMedia } from "../_components/generation-media";
 import { PromptMentionField, extractMentionedAssetIds, type MentionAssetOption } from "../_components/prompt-mention-field";
 
@@ -98,8 +99,7 @@ export function VideoGenerateForm({
   sceneStoryboardUrls,
   sceneStoryboardRatios,
   assetOptions,
-  minDuration,
-  maxDuration,
+  videoModels,
 }: {
   projectId: string;
   sourceImages: SourceOption[];
@@ -112,8 +112,8 @@ export function VideoGenerateForm({
   sceneStoryboardRatios: Record<string, string>;
   /** Every character/location/prop in the project, for the "@" mention dropdown in either mode's prompt. */
   assetOptions: MentionAssetOption[];
-  minDuration: number;
-  maxDuration: number;
+  /** Active video models from the generation_models catalog, lowest sort_order first. */
+  videoModels: ModelOption[];
 }) {
   const [sourceMode, setSourceMode] = useState<"media" | "scene">("media");
   const [prompt, setPrompt] = useState("");
@@ -121,7 +121,9 @@ export function VideoGenerateForm({
   const [sourceUploadId, setSourceUploadId] = useState<string | undefined>(undefined);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
-  const [duration, setDuration] = useState(Math.min(8, maxDuration));
+  const [modelId, setModelId] = useState(videoModels[0]?.id ?? "");
+  const selectedModel = useMemo(() => videoModels.find((m) => m.id === modelId), [videoModels, modelId]);
+  const [duration, setDuration] = useState(Math.min(8, videoModels[0]?.allowedDurations?.max ?? 12));
   const [ratio, setRatio] = useState("16:9");
   const [resolution, setResolution] = useState("720p");
   const [quantity, setQuantity] = useState(1);
@@ -129,7 +131,16 @@ export function VideoGenerateForm({
   const [isPending, startTransition] = useTransition();
   const [isUploading, startUploadTransition] = useTransition();
 
-  const creditCost = videoCreditCost(duration, resolution) * quantity;
+  const minDuration = selectedModel?.allowedDurations?.min ?? 2;
+  const maxDuration = selectedModel?.allowedDurations?.max ?? 12;
+
+  function handleModelChange(id: string) {
+    setModelId(id);
+    const next = videoModels.find((m) => m.id === id);
+    if (next?.allowedDurations) {
+      setDuration((prev) => Math.min(next.allowedDurations!.max, Math.max(next.allowedDurations!.min, prev)));
+    }
+  }
 
   const allSources = [
     ...sourceImages.map((source) => ({ ...source, kind: "image" as const })),
@@ -140,6 +151,25 @@ export function VideoGenerateForm({
     () => (sourceMode === "scene" ? (scenes.find((scene) => scene.id === selectedSceneId) ?? null) : null),
     [sourceMode, selectedSceneId, scenes],
   );
+
+  // Mirrors handleSubmit's own referenceAssetIds derivation, kept in sync so
+  // the displayed credit cost matches what generateVideoFromImage actually
+  // charges (see computeCreditCost's referenceImageCount param).
+  const mentionedAssetIds = useMemo(() => extractMentionedAssetIds(prompt, assetOptions), [prompt, assetOptions]);
+  const referenceAssetIds = useMemo(
+    () =>
+      sourceMode === "scene" && selectedScene
+        ? Array.from(new Set([...selectedScene.assets.map((link) => link.asset_id), ...mentionedAssetIds]))
+        : mentionedAssetIds,
+    [sourceMode, selectedScene, mentionedAssetIds],
+  );
+  // BytePlus drops reference images outright whenever a source image is
+  // attached — the source image becomes the only image input (count=1) —
+  // see media.ts:generateVideoFromImage's own referenceImageCount comment.
+  const referenceImageCount = sourceUrl ? 1 : referenceAssetIds.length;
+  const creditCost = selectedModel
+    ? computeCreditCost(selectedModel, { durationSeconds: duration, resolution, referenceImageCount }) * quantity
+    : 0;
 
   const wardrobeNoteByAssetId = useMemo(() => {
     const map = new Map<string, string>();
@@ -244,7 +274,6 @@ export function VideoGenerateForm({
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
-    const mentionedAssetIds = extractMentionedAssetIds(prompt, assetOptions);
     if (sourceMode === "scene") {
       if (!selectedSceneId) {
         setError("Pick a scene to generate a video for.");
@@ -256,16 +285,8 @@ export function VideoGenerateForm({
     }
     setError(null);
 
-    // Scene mode's source frame (if any) is that scene's own generated
-    // storyboard sheet, auto-attached by selectScene — the clip is driven
-    // by the dialogue prompt plus reference images (the scene's auto-linked
-    // characters/locations/props, unioned with whatever's "@" mentioned in
-    // the dialogue text). Media mode's references come from the prompt's
-    // "@" mentions alone.
-    const referenceAssetIds =
-      sourceMode === "scene" && selectedScene
-        ? Array.from(new Set([...selectedScene.assets.map((link) => link.asset_id), ...mentionedAssetIds]))
-        : mentionedAssetIds;
+    // referenceAssetIds is memoized above (mirrors this same derivation) so
+    // the displayed credit cost stays in sync with what's actually sent.
 
     // The breakdown's scene summary + wardrobe notes, merged into the actual
     // generation prompt alongside dialogue — see buildSceneContext above.
@@ -284,6 +305,7 @@ export function VideoGenerateForm({
           resolution,
           quantity,
           referenceAssetIds: referenceAssetIds.length > 0 ? referenceAssetIds : undefined,
+          modelId,
         });
         setPrompt("");
         if (sourceMode === "scene") {
@@ -511,20 +533,21 @@ export function VideoGenerateForm({
       )}
 
       <div className="flex flex-wrap items-center gap-4">
+        <ModelSelectControl options={videoModels} value={modelId} onChange={handleModelChange} />
         <div className="flex items-center gap-1.5">
           <DurationControl value={duration} onChange={setDuration} min={minDuration} max={maxDuration} />
           {selectedScene?.duration_seconds ? (
             <span className="text-xs text-muted-2">(from scene estimate)</span>
           ) : null}
         </div>
-        <ResolutionControl value={resolution} onChange={setResolution} />
+        <ResolutionControl value={resolution} onChange={setResolution} options={selectedModel?.allowedResolutions} />
         {sourceUrl ? (
           <span className="text-sm text-muted">
             Aspect ratio: {activeSourceRatio ?? "follows the source image"} (fixed — BytePlus derives it from the
             attached image, not the picker)
           </span>
         ) : (
-          <RatioControl value={ratio} onChange={setRatio} />
+          <RatioControl value={ratio} onChange={setRatio} options={selectedModel?.allowedRatios} />
         )}
         <QuantityControl value={quantity} onChange={setQuantity} max={4} />
       </div>

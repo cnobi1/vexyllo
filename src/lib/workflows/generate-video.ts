@@ -29,7 +29,7 @@ function extractErrorMessage(err: unknown): string {
 async function startVideoTask(input: GenerateVideoInput): Promise<VideoTaskHandle> {
   "use step";
   try {
-    return await getVideoProvider().startVideoTask(input);
+    return await getVideoProvider(input.providerKey).startVideoTask(input);
   } catch (err) {
     if (err instanceof NoVideoGeneratedError) {
       // The model declined to produce a video for this input — retrying
@@ -58,9 +58,12 @@ async function startVideoTask(input: GenerateVideoInput): Promise<VideoTaskHandl
   }
 }
 
-async function pollVideoTask(handle: VideoTaskHandle): Promise<VideoTaskResult> {
+async function pollVideoTask(
+  handle: VideoTaskHandle,
+  providerKey: GenerateVideoInput["providerKey"],
+): Promise<VideoTaskResult> {
   "use step";
-  const result = await getVideoProvider().pollVideoTask(handle);
+  const result = await getVideoProvider(providerKey).pollVideoTask(handle);
   if (result.status === "queued" || result.status === "running") {
     // Escalating backoff: fast at first (short clips resolve in a couple of
     // polls), slowing down for long-running jobs so we don't hammer the
@@ -141,7 +144,7 @@ export async function generateVideoWorkflow(
   "use workflow";
   try {
     const handle = await startVideoTask(input);
-    const result = await pollVideoTask(handle);
+    const result = await pollVideoTask(handle, input.providerKey);
     if (result.status !== "succeeded" || !result.url) {
       throw new Error("Video task resolved without a URL");
     }

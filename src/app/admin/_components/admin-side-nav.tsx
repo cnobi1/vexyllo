@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode, SVGProps } from "react";
+import type { AdminRole } from "@/lib/actions/admin-guard";
 
 function Icon({ children, ...props }: SVGProps<SVGSVGElement> & { children: ReactNode }) {
   return (
@@ -35,8 +36,19 @@ const NAV_ITEMS = [
     ),
   },
   {
+    label: "Models",
+    href: "/admin/models",
+    icon: (props: SVGProps<SVGSVGElement>) => (
+      <Icon {...props}>
+        <rect x="4" y="4" width="16" height="16" rx="3" />
+        <path d="M9 9h.01M15 9h.01M9 15h6" />
+      </Icon>
+    ),
+  },
+  {
     label: "Users",
     href: "/admin/users",
+    superAdminOnly: true,
     icon: (props: SVGProps<SVGSVGElement>) => (
       <Icon {...props}>
         <circle cx="9" cy="8" r="3.5" />
@@ -46,10 +58,21 @@ const NAV_ITEMS = [
       </Icon>
     ),
   },
+  {
+    label: "Admins",
+    href: "/admin/admins",
+    superAdminOnly: true,
+    icon: (props: SVGProps<SVGSVGElement>) => (
+      <Icon {...props}>
+        <path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3Z" />
+      </Icon>
+    ),
+  },
 ] as const;
 
-export function AdminSideNav({ onNavigate }: { onNavigate?: () => void }) {
+export function AdminSideNav({ role, onNavigate }: { role: AdminRole; onNavigate?: () => void }) {
   const pathname = usePathname();
+  const items = NAV_ITEMS.filter((item) => !("superAdminOnly" in item && item.superAdminOnly) || role === "super_admin");
 
   return (
     <nav className="flex h-full flex-col gap-1 p-3">
@@ -59,7 +82,7 @@ export function AdminSideNav({ onNavigate }: { onNavigate?: () => void }) {
 
       <div className="mb-1 px-2 text-xs font-medium uppercase tracking-wide text-muted-2">Manage</div>
 
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const isActive = pathname === item.href;
         const IconComponent = item.icon;
         return (

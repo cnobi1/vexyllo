@@ -1,7 +1,6 @@
 import { byteplusJson } from "../byteplus/client";
 import type { GenerateVideoInput, VideoProvider, VideoTaskHandle, VideoTaskResult, VideoTaskStatus } from "./types";
 
-const MODEL = process.env.BYTEPLUS_VIDEO_MODEL;
 // Seedance 2.0's multimodal reference-image mode caps at 9 references;
 // other models only support a single first-frame image. Enforced here
 // rather than silently dropping extras or letting BytePlus reject the call.
@@ -23,10 +22,10 @@ interface RetrieveTaskResponse {
 }
 
 export const byteplusVideoAdapter: VideoProvider = {
-  name: "byteplus:" + (MODEL ?? "unconfigured"),
+  name: "byteplus",
   async startVideoTask(input: GenerateVideoInput): Promise<VideoTaskHandle> {
-    if (!MODEL) {
-      throw new Error("BYTEPLUS_VIDEO_MODEL is not configured");
+    if (!process.env.BYTEPLUS_API_KEY) {
+      throw new Error("BYTEPLUS_API_KEY is not configured");
     }
     // BytePlus rejects a request that combines a first-frame image with
     // reference images outright ("first/last frame content cannot be mixed
@@ -70,7 +69,7 @@ export const byteplusVideoAdapter: VideoProvider = {
     }
 
     const body: Record<string, unknown> = {
-      model: MODEL,
+      model: input.modelId,
       content,
       // The user-facing "how many seconds" control, passed straight
       // through — no clamping here. An out-of-range value surfaces as a

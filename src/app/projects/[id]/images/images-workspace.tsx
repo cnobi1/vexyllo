@@ -6,6 +6,7 @@ import { ImageGenerateForm, type Mode, type MediaMentionOption } from "./image-g
 import { GenerationFeed } from "../_components/generation-feed";
 import type { CharacterOption } from "../_components/character-picker";
 import type { MediaGridItem } from "../_components/media-grid";
+import type { ModelOption } from "../_components/model-select-control";
 
 type GenerationRow = MediaGridItem & { kind: string; created_at: string };
 
@@ -24,16 +25,16 @@ export function ImagesWorkspace({
   initialItems,
   uploads,
   videoInitialItems,
-  minDuration,
-  maxDuration,
+  imageModels,
+  videoModels,
 }: {
   projectId: string;
   characters: CharacterOption[];
   initialItems: GenerationRow[];
   uploads: { id: string; storagePath: string; url: string | null }[];
   videoInitialItems: GenerationRow[];
-  minDuration: number;
-  maxDuration: number;
+  imageModels: ModelOption[];
+  videoModels: ModelOption[];
 }) {
   const [prefill, setPrefill] = useState<{ value: string; nonce: number } | null>(null);
   const [mode, setMode] = useState<Mode>("generate");
@@ -159,8 +160,8 @@ export function ImagesWorkspace({
         onModeChange={setMode}
         uploadMentionOptions={uploadMentionOptions}
         imageMentionOptions={imageMentionOptions}
-        minDuration={minDuration}
-        maxDuration={maxDuration}
+        imageModels={imageModels}
+        videoModels={videoModels}
       />
       {mode === "video" ? (
         <GenerationFeed

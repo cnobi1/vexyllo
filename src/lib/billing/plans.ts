@@ -14,10 +14,18 @@ export interface Plan {
 // across every tier instead of discounting as plan size goes up — a
 // discount here previously undercut the real cost of a credit (see
 // credit-costs.ts) at the Pro and Studio tiers, turning a bigger plan into a
-// bigger loss per generation. Re-validate against real BytePlus invoice
-// numbers once available; swap in real Stripe Price IDs (via env vars) once
-// a Stripe account is connected — no live STRIPE_SECRET_KEY is set yet, so
-// billing currently runs on the mock adapter and collects no real payment.
+// bigger loss per generation. Swap in real Stripe Price IDs (via env vars)
+// once a Stripe account is connected — no live STRIPE_SECRET_KEY is set yet,
+// so billing currently runs on the mock adapter and collects no real payment.
+//
+// Video credit pricing was recalibrated against a real BytePlus invoice on
+// 2026-09-08 (see credit-costs.ts and
+// supabase/migrations/20260908000000_recalibrate_video_credit_pricing.sql) —
+// Seedance video generation was underpriced 5-10x. monthlyCredits below were
+// deliberately left unchanged in that fix: at the corrected price, a Studio
+// subscriber's 700 credits now buys roughly 3-4 videos/month (8s/480p)
+// instead of ~29. Whether to raise these allotments/prices for video is a
+// separate, still-open pricing decision — not resolved by this comment.
 export const PLANS: Plan[] = [
   { id: "starter", name: "Starter", priceUsd: 9, monthlyCredits: 80, stripePriceId: process.env.STRIPE_PRICE_STARTER },
   { id: "pro", name: "Pro", priceUsd: 29, monthlyCredits: 260, stripePriceId: process.env.STRIPE_PRICE_PRO },

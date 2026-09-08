@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/server";
-import { requireAdmin } from "@/lib/actions/admin-guard";
+import { requireSuperAdmin } from "@/lib/actions/admin-guard";
 import { UsersTable, type AdminUser } from "@/app/admin/_components/users-table";
 
 export default async function AdminUsersPage() {
   const supabase = await createClient();
-  await requireAdmin(supabase);
+  await requireSuperAdmin(supabase);
 
   const { data, error } = await supabase.rpc("admin_list_users");
   if (error) {

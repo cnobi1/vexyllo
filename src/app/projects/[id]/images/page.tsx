@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resolveAssetImageUrlMap } from "@/lib/media/asset-references";
-import { getVideoModelLimits } from "@/lib/providers/byteplus/model-limits";
+import { loadModelOptions } from "@/lib/billing/resolve-model";
 import { ImagesWorkspace } from "./images-workspace";
 import { DeleteUploadButton } from "./delete-upload-button";
 
@@ -61,7 +61,10 @@ export default async function ImagesPage({ params }: { params: Promise<{ id: str
     .order("created_at", { ascending: false })
     .limit(60);
 
-  const limits = getVideoModelLimits(process.env.BYTEPLUS_VIDEO_MODEL);
+  const [imageModels, videoModels] = await Promise.all([
+    loadModelOptions(supabase, "image"),
+    loadModelOptions(supabase, "video"),
+  ]);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-6 py-10">
@@ -86,8 +89,8 @@ export default async function ImagesPage({ params }: { params: Promise<{ id: str
           url: upload.url,
         }))}
         videoInitialItems={videoGenerations ?? []}
-        minDuration={limits.minDurationSeconds}
-        maxDuration={limits.maxDurationSeconds}
+        imageModels={imageModels}
+        videoModels={videoModels}
       />
 
       {signedUploads.length > 0 && (

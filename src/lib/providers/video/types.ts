@@ -14,6 +14,10 @@ export interface GenerateVideoInput {
   durationSeconds: number;
   resolution?: "480p" | "720p" | "1080p" | "4k";
   ratio?: "16:9" | "4:3" | "1:1" | "3:4" | "9:16" | "21:9" | "adaptive";
+  /** Provider-facing model id string (generation_models.provider_model_id) — which model to call within whichever adapter providerKey selects. */
+  modelId: string;
+  /** Which adapter to dispatch to (generation_models.provider_key) — resolved server-side from the chosen catalog row, not user-supplied directly. */
+  providerKey: "byteplus" | "gateway" | "alibaba" | "mock";
 }
 
 export type VideoTaskStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled" | "expired";

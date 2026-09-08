@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useTransition, type ChangeEvent, type FormEvent } from "react";
+import { useMemo, useState, useTransition, type ChangeEvent, type FormEvent } from "react";
 import { generateFreeformImages, generateVideoFromImage } from "@/lib/actions/media";
 import { uploadImage } from "@/lib/actions/uploads";
 import { createClient } from "@/lib/supabase/client";
-import { IMAGE_CREDIT_COST, videoCreditCost } from "@/lib/billing/credit-costs";
+import { computeCreditCost } from "@/lib/billing/credit-costs";
 import { QuantityControl } from "../_components/quantity-control";
 import { RatioControl } from "../_components/ratio-control";
 import { DurationControl } from "../_components/duration-control";
 import { ResolutionControl } from "../_components/resolution-control";
+import { ModelSelectControl, type ModelOption } from "../_components/model-select-control";
 import type { CharacterOption } from "../_components/character-picker";
 import { PromptMentionField, extractMentionedAssetIds, type MentionAssetOption } from "../_components/prompt-mention-field";
 
@@ -25,8 +26,8 @@ export function ImageGenerateForm({
   onModeChange,
   uploadMentionOptions,
   imageMentionOptions,
-  minDuration,
-  maxDuration,
+  imageModels,
+  videoModels,
 }: {
   projectId: string;
   characters: CharacterOption[];
@@ -38,23 +39,40 @@ export function ImageGenerateForm({
   uploadMentionOptions: MediaMentionOption[];
   /** @-mentionable succeeded freeform-image generations, kept live via a realtime subscription in images-workspace.tsx. */
   imageMentionOptions: MediaMentionOption[];
-  minDuration: number;
-  maxDuration: number;
+  /** Active image/video models from the generation_models catalog, lowest sort_order first — the form defaults to the first entry of each, same "pick for me" default the catalog seed relies on. */
+  imageModels: ModelOption[];
+  videoModels: ModelOption[];
 }) {
   const [prompt, setPrompt] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [ratio, setRatio] = useState("16:9");
+  const [modelId, setModelId] = useState(imageModels[0]?.id ?? "");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isUploading, startUploadTransition] = useTransition();
   const [appliedNonce, setAppliedNonce] = useState(prefill?.nonce);
 
+  const selectedModel = useMemo(() => imageModels.find((m) => m.id === modelId), [imageModels, modelId]);
+
   const [videoPrompt, setVideoPrompt] = useState("");
-  const [videoDuration, setVideoDuration] = useState(() => Math.min(8, maxDuration));
+  const [videoModelId, setVideoModelId] = useState(videoModels[0]?.id ?? "");
+  const selectedVideoModel = useMemo(
+    () => videoModels.find((m) => m.id === videoModelId),
+    [videoModels, videoModelId],
+  );
+  const [videoDuration, setVideoDuration] = useState(() => Math.min(8, videoModels[0]?.allowedDurations?.max ?? 12));
   const [videoResolution, setVideoResolution] = useState("720p");
   const [videoRatio, setVideoRatio] = useState("16:9");
   const [videoQuantity, setVideoQuantity] = useState(1);
   const [isGeneratingVideo, startVideoTransition] = useTransition();
+
+  function handleVideoModelChange(id: string) {
+    setVideoModelId(id);
+    const next = videoModels.find((m) => m.id === id);
+    if (next?.allowedDurations) {
+      setVideoDuration((prev) => Math.min(next.allowedDurations!.max, Math.max(next.allowedDurations!.min, prev)));
+    }
+  }
 
   // Adjusting state in response to a prop change is done during render
   // (React's recommended pattern), not in an effect.
@@ -109,6 +127,7 @@ export function ImageGenerateForm({
           ratio: ratio || undefined,
           referenceAssetIds: referenceAssetIds.length > 0 ? referenceAssetIds : undefined,
           extraReferenceImageUrls,
+          modelId,
         });
         setPrompt("");
       } catch (err) {
@@ -198,6 +217,7 @@ export function ImageGenerateForm({
           resolution: videoResolution,
           ratio: videoRatio || undefined,
           quantity: videoQuantity,
+          modelId: videoModelId,
         });
         setVideoPrompt("");
       } catch (err) {
@@ -206,7 +226,10 @@ export function ImageGenerateForm({
     });
   }
 
-  const videoCreditTotal = videoCreditCost(videoDuration, videoResolution) * videoQuantity;
+  const videoCreditTotal = selectedVideoModel
+    ? computeCreditCost(selectedVideoModel, { durationSeconds: videoDuration, resolution: videoResolution }) * videoQuantity
+    : 0;
+  const imageCreditTotal = selectedModel ? computeCreditCost(selectedModel) * quantity : 0;
 
   return (
     <div className="card-glow flex flex-col gap-3 rounded-2xl p-6">
@@ -274,9 +297,19 @@ export function ImageGenerateForm({
             placeholder="Describe the motion/action… type @ to reference an uploaded or generated image as the video's source"
           />
           <div className="flex flex-wrap items-center gap-4">
-            <DurationControl value={videoDuration} onChange={setVideoDuration} min={minDuration} max={maxDuration} />
-            <ResolutionControl value={videoResolution} onChange={setVideoResolution} />
-            <RatioControl value={videoRatio} onChange={setVideoRatio} />
+            <ModelSelectControl options={videoModels} value={videoModelId} onChange={handleVideoModelChange} />
+            <DurationControl
+              value={videoDuration}
+              onChange={setVideoDuration}
+              min={selectedVideoModel?.allowedDurations?.min ?? 2}
+              max={selectedVideoModel?.allowedDurations?.max ?? 12}
+            />
+            <ResolutionControl
+              value={videoResolution}
+              onChange={setVideoResolution}
+              options={selectedVideoModel?.allowedResolutions}
+            />
+            <RatioControl value={videoRatio} onChange={setVideoRatio} options={selectedVideoModel?.allowedRatios} />
             <QuantityControl value={videoQuantity} onChange={setVideoQuantity} max={4} />
           </div>
           <div className="flex items-center justify-end gap-2">
@@ -306,12 +339,13 @@ export function ImageGenerateForm({
           />
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-4">
+              <ModelSelectControl options={imageModels} value={modelId} onChange={setModelId} />
               <QuantityControl value={quantity} onChange={setQuantity} />
-              <RatioControl value={ratio} onChange={setRatio} />
+              <RatioControl value={ratio} onChange={setRatio} options={selectedModel?.allowedRatios} />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted">
-                {quantity * IMAGE_CREDIT_COST} credit{quantity * IMAGE_CREDIT_COST === 1 ? "" : "s"}
+                {imageCreditTotal} credit{imageCreditTotal === 1 ? "" : "s"}
               </span>
               <button
                 type="submit"

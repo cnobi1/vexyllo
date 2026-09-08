@@ -2,6 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { AdminSideNav } from "./admin-side-nav";
+import type { AdminRole } from "@/lib/actions/admin-guard";
 
 function HamburgerIcon() {
   return (
@@ -41,10 +42,12 @@ function DashboardIcon() {
 
 export function AdminShell({
   email,
+  role,
   logoutAction,
   children,
 }: {
   email: string;
+  role: AdminRole;
   logoutAction: () => Promise<void>;
   children: ReactNode;
 }) {
@@ -53,7 +56,7 @@ export function AdminShell({
   const navPanel = (onNavigate?: () => void) => (
     <div className="flex h-full flex-col">
       <div className="flex-1">
-        <AdminSideNav onNavigate={onNavigate} />
+        <AdminSideNav role={role} onNavigate={onNavigate} />
       </div>
       <div className="border-t border-border p-3">
         <div className="truncate px-2.5 pb-2 text-xs text-muted-2" title={email}>

@@ -11,8 +11,9 @@ import { resolveAssetReferenceUrls } from "@/lib/media/asset-references";
 import { generateVideoWorkflow } from "@/lib/workflows/generate-video";
 import { buildCharacterSheetPrompt } from "@/lib/prompts/character-sheet";
 import { buildPropSheetPrompt } from "@/lib/prompts/prop-sheet";
-import { IMAGE_CREDIT_COST, videoCreditCost } from "@/lib/billing/credit-costs";
+import { computeCreditCost } from "@/lib/billing/credit-costs";
 import { requireCredits, recordSpend } from "@/lib/billing/spend-credits";
+import { loadActiveModel, loadDefaultActiveModel } from "@/lib/billing/resolve-model";
 import { withTransientRetry } from "@/lib/providers/retry";
 import { loadOwnedProject } from "./project-guard";
 
@@ -46,6 +47,7 @@ async function insertGenerationBatch(
     kind: "freeform_image" | "character_sheet";
     assetId?: string;
     provider: string;
+    model: string;
     batchId: string;
     quantity: number;
     params: Record<string, unknown>;
@@ -61,6 +63,7 @@ async function insertGenerationBatch(
         type: "image",
         status: "pending",
         provider: args.provider,
+        model: args.model,
         batch_id: args.batchId,
         params: args.params,
       })),
@@ -83,6 +86,7 @@ async function settleImageBatch(
   supabase: Supabase,
   projectId: string,
   userId: string,
+  creditCost: number,
   rows: { id: string }[],
   images: { url: string; cost: number | null }[],
 ): Promise<{ id: string; path: string; signedUrl: string }[]> {
@@ -97,7 +101,7 @@ async function settleImageBatch(
         .eq("id", rows[i].id);
       // Only charged on a confirmed success — a row that fails below
       // (fewer images than requested) simply never gets billed.
-      await recordSpend(userId, IMAGE_CREDIT_COST, "generation_image", rows[i].id);
+      await recordSpend(userId, creditCost, "generation_image", rows[i].id);
       succeeded.push({ id: rows[i].id, ...copied });
     } else {
       await supabase
@@ -120,11 +124,13 @@ export async function generateFreeformImages(
     referenceImageOverrides?: Record<string, string>;
     /** Reference image URLs already resolved client-side (e.g. from an @-mentioned upload or a previously-generated image, not tied to a character/location/prop asset) — merged with the asset-derived references below before the provider call. */
     extraReferenceImageUrls?: string[];
+    modelId: string;
   },
 ) {
   const supabase = await createClient();
   const project = await loadOwnedProject(supabase, projectId);
-  const provider = getImageProvider();
+  const model = await loadActiveModel(supabase, input.modelId, "image");
+  const provider = getImageProvider(model.providerKey);
 
   const assetReferenceImageUrls = input.referenceAssetIds?.length
     ? await resolveAssetReferenceUrls(supabase, projectId, input.referenceAssetIds, input.referenceImageOverrides)
@@ -132,13 +138,15 @@ export async function generateFreeformImages(
   const referenceImageUrls = [...(assetReferenceImageUrls ?? []), ...(input.extraReferenceImageUrls ?? [])];
 
   const quantity = clampQuantity(input.quantity);
-  await requireCredits(project.userId, IMAGE_CREDIT_COST * quantity);
+  const creditCost = computeCreditCost(model);
+  await requireCredits(project.userId, creditCost * quantity);
 
   const batchId = crypto.randomUUID();
   const rows = await insertGenerationBatch(supabase, {
     projectId,
     kind: "freeform_image",
     provider: provider.name,
+    model: model.providerModelId,
     batchId,
     quantity,
     params: {
@@ -162,10 +170,11 @@ export async function generateFreeformImages(
           referenceImageUrls: referenceImageUrls.length > 0 ? referenceImageUrls : undefined,
           quantity,
           ratio: input.ratio,
+          modelId: model.providerModelId,
         }),
       );
       // settleImageBatch charges each row only as it confirms success.
-      await settleImageBatch(worker, projectId, project.userId, rows, result.images);
+      await settleImageBatch(worker, projectId, project.userId, creditCost, rows, result.images);
     } catch (err) {
       // Only rows settleImageBatch never got to (still "pending") get
       // marked failed here — rows it already settled have their own status
@@ -186,11 +195,20 @@ export async function generateFreeformImages(
 export async function generateCharacterSheet(
   projectId: string,
   assetId: string,
-  input: { prompt: string; quantity: number; ratio?: string },
+  // modelId is optional here (unlike generateFreeformImages/generateVideoFromImage):
+  // this backs the small inline "Generate" card on the Scenes Assets/Characters
+  // tabs and autofillAssetImages' bulk action, none of which have a model
+  // picker in the UI — omit it to fall through to the catalog's own default
+  // (lowest sort_order active image model), same one the picker itself
+  // defaults to.
+  input: { prompt: string; quantity: number; ratio?: string; modelId?: string },
 ) {
   const supabase = await createClient();
   const project = await loadOwnedProject(supabase, projectId);
-  const provider = getImageProvider();
+  const model = input.modelId
+    ? await loadActiveModel(supabase, input.modelId, "image")
+    : await loadDefaultActiveModel(supabase, "image");
+  const provider = getImageProvider(model.providerKey);
 
   const { data: asset, error: assetError } = await supabase
     .from("assets")
@@ -223,7 +241,8 @@ export async function generateCharacterSheet(
         : input.prompt;
 
   const quantity = clampQuantity(input.quantity);
-  await requireCredits(project.userId, IMAGE_CREDIT_COST * quantity);
+  const creditCost = computeCreditCost(model);
+  await requireCredits(project.userId, creditCost * quantity);
 
   const batchId = crypto.randomUUID();
   const rows = await insertGenerationBatch(supabase, {
@@ -231,6 +250,7 @@ export async function generateCharacterSheet(
     kind: "character_sheet",
     assetId,
     provider: provider.name,
+    model: model.providerModelId,
     batchId,
     quantity,
     params: { prompt: input.prompt, quantity, ratio: input.ratio ?? null, hasReference: Boolean(referenceImageUrls) },
@@ -246,9 +266,10 @@ export async function generateCharacterSheet(
           referenceImageUrls,
           quantity,
           ratio: input.ratio,
+          modelId: model.providerModelId,
         }),
       );
-      const succeeded = await settleImageBatch(worker, projectId, project.userId, rows, result.images);
+      const succeeded = await settleImageBatch(worker, projectId, project.userId, creditCost, rows, result.images);
       if (succeeded.length === 0) return;
 
       await worker.from("asset_images").insert(
@@ -314,6 +335,9 @@ export async function autofillAssetImages(projectId: string, type: string) {
 
   const targets = (assets ?? []).filter((asset) => !asset.reference_image_url);
 
+  // No model-picker UI on this bulk action — generateCharacterSheet falls
+  // through to the catalog's own default (lowest sort_order active image
+  // model) when modelId is omitted.
   await Promise.all(
     targets.map((asset) =>
       generateCharacterSheet(projectId, asset.id, {
@@ -342,6 +366,7 @@ export async function generateVideoFromImage(
     referenceAssetIds?: string[];
     /** Number of independent clips to generate from this same request. Defaults to 1. */
     quantity?: number;
+    modelId: string;
   },
 ) {
   if (!input.sourceUrl && !input.referenceAssetIds?.length) {
@@ -350,7 +375,8 @@ export async function generateVideoFromImage(
 
   const supabase = await createClient();
   const project = await loadOwnedProject(supabase, projectId);
-  const provider = getVideoProvider();
+  const model = await loadActiveModel(supabase, input.modelId, "video");
+  const provider = getVideoProvider(model.providerKey);
 
   const referenceImageUrls = input.referenceAssetIds?.length
     ? await resolveAssetReferenceUrls(supabase, projectId, input.referenceAssetIds)
@@ -363,7 +389,16 @@ export async function generateVideoFromImage(
   const quantity = clampVideoQuantity(input.quantity ?? 1);
   const batchId = quantity > 1 ? crypto.randomUUID() : null;
 
-  const creditCost = videoCreditCost(input.durationSeconds, input.resolution);
+  // BytePlus drops reference images outright whenever a source/first-frame
+  // image is present (see byteplus-adapter.ts) — the first-frame image is
+  // then the only image input actually sent, same as a single reference
+  // image, so it's billed the same way (count=1) rather than 0.
+  const referenceImageCount = input.sourceUrl ? 1 : (referenceImageUrls?.length ?? 0);
+  const creditCost = computeCreditCost(model, {
+    durationSeconds: input.durationSeconds,
+    resolution: input.resolution,
+    referenceImageCount,
+  });
   await requireCredits(project.userId, creditCost * quantity);
 
   for (let i = 0; i < quantity; i++) {
@@ -377,6 +412,7 @@ export async function generateVideoFromImage(
         type: "video",
         status: "pending",
         provider: provider.name,
+        model: model.providerModelId,
         source_upload_id: input.sourceUploadId ?? null,
         batch_id: batchId,
         params: {
@@ -412,6 +448,8 @@ export async function generateVideoFromImage(
         durationSeconds: input.durationSeconds,
         resolution: input.resolution as GenerateVideoInput["resolution"] | undefined,
         ratio: input.ratio as GenerateVideoInput["ratio"] | undefined,
+        modelId: model.providerModelId,
+        providerKey: model.providerKey,
       } satisfies GenerateVideoInput,
       project.userId,
       creditCost,

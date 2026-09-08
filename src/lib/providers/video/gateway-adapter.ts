@@ -1,7 +1,6 @@
 import { experimental_generateVideo } from "ai";
 import type { GenerateVideoInput, VideoProvider, VideoTaskHandle, VideoTaskResult } from "./types";
 
-const MODEL = "google/veo-3.1-generate-001";
 // Cost is intentionally left unconfirmed (null) rather than guessed: unlike
 // the image adapter's COST_PER_IMAGE (checked against the AI Gateway's
 // /v1/models pricing endpoint), this model's per-clip pricing has not been
@@ -10,7 +9,7 @@ const MODEL = "google/veo-3.1-generate-001";
 const COST_PER_VIDEO: number | null = null;
 
 export const gatewayVideoAdapter: VideoProvider = {
-  name: "gateway:" + MODEL,
+  name: "gateway",
   async startVideoTask(input: GenerateVideoInput): Promise<VideoTaskHandle> {
     // The AI SDK's experimental_generateVideo call is blocking — there's no
     // real "task" to poll, so the work happens here and the result is
@@ -29,7 +28,7 @@ export const gatewayVideoAdapter: VideoProvider = {
       .join("\n\n");
 
     const { video } = await experimental_generateVideo({
-      model: MODEL,
+      model: input.modelId,
       prompt: fullPrompt,
       aspectRatio: input.ratio && input.ratio !== "adaptive" ? input.ratio : "16:9",
       duration: input.durationSeconds,

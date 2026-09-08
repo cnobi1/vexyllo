@@ -8,7 +8,7 @@ export default async function AdminProtectedLayout({ children }: { children: Rea
   const user = await requireAdmin(supabase);
 
   return (
-    <AdminShell email={user.email ?? ""} logoutAction={logout}>
+    <AdminShell email={user.email ?? ""} role={user.adminRole} logoutAction={logout}>
       {children}
     </AdminShell>
   );

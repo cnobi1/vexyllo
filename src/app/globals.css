@@ -152,6 +152,18 @@ body {
   transform: translateY(1px);
 }
 
+/* Shared text/select/textarea styling for admin forms (models, admins) —
+   matches the inline utility classes already hand-written on inputs
+   elsewhere in the app (e.g. duration-control.tsx), pulled into one class
+   since model-form.tsx has many fields. */
+.input {
+  @apply rounded-lg border border-border bg-background/60 px-2.5 py-1.5 text-sm text-foreground outline-none;
+}
+
+.input:focus {
+  @apply border-border-strong;
+}
+
 .card-glow {
   border: 1px solid var(--border);
   background: var(--surface);

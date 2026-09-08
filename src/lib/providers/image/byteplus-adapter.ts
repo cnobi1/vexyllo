@@ -2,11 +2,11 @@ import { byteplusJson } from "../byteplus/client";
 import { ratioToImageSize } from "../byteplus/image-sizes";
 import type { GeneratedImage, GenerateImageInput, GenerateImageResult, ImageProvider } from "./types";
 
-const MODEL = process.env.BYTEPLUS_IMAGE_MODEL;
-// Not independently verified against a live BytePlus billing/usage
-// endpoint — treat as a placeholder until confirmed, same caveat as the
-// Gateway adapter's COST_PER_IMAGE/COST_PER_VIDEO constants.
-const COST_PER_IMAGE = 0.02;
+// Confirmed against a real BytePlus invoice
+// (bill_detail_3003786644_20260908_20260901_479063.csv, 2026-09-06/07):
+// Seedream 5.0 Pro billed $0.09/image ("Piece" unit) — see credit-costs.ts
+// for how this compares against IMAGE_CREDIT_COST.
+const COST_PER_IMAGE = 0.09;
 
 interface ImageGenerationResponse {
   data?: { url: string; size?: string }[];
@@ -28,7 +28,7 @@ async function requestImages(
   useSequentialGeneration: boolean,
 ): Promise<GeneratedImage[]> {
   const body: Record<string, unknown> = {
-    model: MODEL,
+    model: input.modelId,
     prompt: buildFullPrompt(input),
     watermark: false,
     response_format: "url",
@@ -60,10 +60,10 @@ function isSequentialGenerationUnsupported(err: unknown): boolean {
 }
 
 export const byteplusImageAdapter: ImageProvider = {
-  name: "byteplus:" + (MODEL ?? "unconfigured"),
+  name: "byteplus",
   async generateImage(input: GenerateImageInput): Promise<GenerateImageResult> {
-    if (!MODEL) {
-      throw new Error("BYTEPLUS_IMAGE_MODEL is not configured");
+    if (!process.env.BYTEPLUS_API_KEY) {
+      throw new Error("BYTEPLUS_API_KEY is not configured");
     }
 
     const quantity = input.quantity ?? 1;

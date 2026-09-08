@@ -5,6 +5,7 @@ import { start } from "workflow/api";
 import { createClient } from "@/lib/supabase/server";
 import { getImageProvider } from "@/lib/providers/image";
 import { getVideoProvider } from "@/lib/providers/video";
+import type { GenerateVideoInput } from "@/lib/providers/video";
 import { copyToMediaBucket } from "@/lib/media/copy-to-storage";
 import { resolveAssetReferenceUrls } from "@/lib/media/asset-references";
 import { generateVideoWorkflow } from "@/lib/workflows/generate-video";
@@ -14,8 +15,9 @@ import {
   type StoryboardGrid,
   type StoryboardShot,
 } from "@/lib/prompts/scene-storyboard";
-import { IMAGE_CREDIT_COST, videoCreditCost } from "@/lib/billing/credit-costs";
+import { computeCreditCost } from "@/lib/billing/credit-costs";
 import { requireCredits, recordSpend } from "@/lib/billing/spend-credits";
+import { loadActiveModel } from "@/lib/billing/resolve-model";
 import { withTransientRetry } from "@/lib/providers/retry";
 import { loadOwnedProject } from "./project-guard";
 
@@ -107,10 +109,11 @@ async function loadShotForGeneration(
 export async function generateSceneStoryboard(
   projectId: string,
   sceneId: string,
-  input: { prompt: string; grid: StoryboardGrid; referenceAssetIds?: string[] },
+  input: { prompt: string; grid: StoryboardGrid; referenceAssetIds?: string[]; modelId: string },
 ) {
   const supabase = await createClient();
   const project = await loadOwnedProject(supabase, projectId);
+  const model = await loadActiveModel(supabase, input.modelId, "image");
 
   const { data: scene, error: sceneError } = await supabase
     .from("scenes")
@@ -135,12 +138,13 @@ export async function generateSceneStoryboard(
     description: shot.prompt,
   }));
 
-  const provider = getImageProvider();
+  const provider = getImageProvider(model.providerKey);
   const referenceImageUrls = input.referenceAssetIds?.length
     ? await resolveAssetReferenceUrls(supabase, projectId, input.referenceAssetIds)
     : undefined;
 
-  await requireCredits(project.userId, IMAGE_CREDIT_COST);
+  const creditCost = computeCreditCost(model);
+  await requireCredits(project.userId, creditCost);
 
   const { data: generation, error: insertError } = await supabase
     .from("generations")
@@ -149,6 +153,7 @@ export async function generateSceneStoryboard(
       project_id: projectId,
       kind: "scene_storyboard",
       provider: provider.name,
+      model: model.providerModelId,
       type: "image",
       status: "pending",
       params: { prompt, grid: input.grid, referenceAssetIds: input.referenceAssetIds ?? [] },
@@ -172,6 +177,7 @@ export async function generateSceneStoryboard(
           style: project.style,
           referenceImageUrls,
           ratio: gridToRatio(input.grid),
+          modelId: model.providerModelId,
         }),
       );
       const [image] = result.images;
@@ -185,7 +191,7 @@ export async function generateSceneStoryboard(
         .eq("id", generationId);
       // Only charged on a confirmed success — a failed attempt below never
       // calls this, so there's nothing to refund.
-      await recordSpend(project.userId, IMAGE_CREDIT_COST, "generation_image", generationId);
+      await recordSpend(project.userId, creditCost, "generation_image", generationId);
     } catch (err) {
       await worker
         .from("generations")
@@ -198,17 +204,28 @@ export async function generateSceneStoryboard(
   });
 }
 
-export async function generateShotVideo(shotId: string) {
+export async function generateShotVideo(shotId: string, modelId: string) {
   const supabase = await createClient();
   const { prompt, style, projectId, userId, referenceImageUrls } = await loadShotForGeneration(supabase, shotId);
+  const model = await loadActiveModel(supabase, modelId, "video");
 
-  const provider = getVideoProvider();
-  const creditCost = videoCreditCost(DEFAULT_SHOT_VIDEO_DURATION_SECONDS);
+  const provider = getVideoProvider(model.providerKey);
+  const creditCost = computeCreditCost(model, {
+    durationSeconds: DEFAULT_SHOT_VIDEO_DURATION_SECONDS,
+    referenceImageCount: referenceImageUrls?.length ?? 0,
+  });
   await requireCredits(userId, creditCost);
 
   const { data: generation, error: insertError } = await supabase
     .from("generations")
-    .insert({ shot_id: shotId, project_id: projectId, provider: provider.name, type: "video", status: "pending" })
+    .insert({
+      shot_id: shotId,
+      project_id: projectId,
+      provider: provider.name,
+      model: model.providerModelId,
+      type: "video",
+      status: "pending",
+    })
     .select("id")
     .single();
   if (insertError || !generation) {
@@ -230,7 +247,14 @@ export async function generateShotVideo(shotId: string) {
   const run = await start(generateVideoWorkflow, [
     generation.id,
     projectId,
-    { prompt, style, durationSeconds: DEFAULT_SHOT_VIDEO_DURATION_SECONDS, referenceImageUrls },
+    {
+      prompt,
+      style,
+      durationSeconds: DEFAULT_SHOT_VIDEO_DURATION_SECONDS,
+      referenceImageUrls,
+      modelId: model.providerModelId,
+      providerKey: model.providerKey,
+    } satisfies GenerateVideoInput,
     userId,
     creditCost,
     shotId,
