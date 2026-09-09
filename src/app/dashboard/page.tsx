@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
 import { createProject } from "@/lib/actions/projects";
 import { formatRelativeDate } from "@/lib/format-relative-date";
@@ -86,7 +87,7 @@ export default async function DashboardPage() {
     <div className="relative flex flex-1 flex-col">
       <div className="hero-glow" aria-hidden="true" />
       <div className="relative flex flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/80 px-6 py-4 backdrop-blur-md">
+        <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4">
           <Link href="/dashboard">
             <Logo className="h-7 w-auto" />
           </Link>
@@ -97,12 +98,23 @@ export default async function DashboardPage() {
         </header>
 
         <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-10 px-6 py-14">
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-2 text-center">
-            <h2 className="text-3xl font-bold sm:text-4xl">
-              Welcome back{firstName ? `, ${firstName}` : ""}
-            </h2>
-            <p className="text-sm text-muted">Pick up where you left off, or start something new.</p>
-          </div>
+          <section className="relative h-56 w-full overflow-hidden rounded-2xl sm:h-72">
+            <Image
+              src="/marketing/services-scene-characters.jpg"
+              alt=""
+              fill
+              priority
+              sizes="(min-width: 1280px) 1280px, 100vw"
+              className="object-cover"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
+            <div className="absolute inset-0 flex flex-col justify-end gap-1 p-6 sm:p-8">
+              <h2 className="text-3xl font-bold text-white sm:text-4xl">
+                Welcome back{firstName ? `, ${firstName}` : ""}
+              </h2>
+              <p className="text-sm text-white/80">Pick up where you left off, or start something new.</p>
+            </div>
+          </section>
 
           <form
             action={createProject}
@@ -116,13 +128,23 @@ export default async function DashboardPage() {
                 </span>
                 New project
               </h2>
-              <input
-                name="title"
-                placeholder="Project title, e.g. Neon Skyline"
-                required
-                className="rounded-lg border border-border bg-background/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
-              />
-              <NewProjectStyleField />
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+                <div className="flex flex-1 flex-col gap-1.5">
+                  <label htmlFor="title" className="text-sm text-muted">
+                    Title
+                  </label>
+                  <input
+                    id="title"
+                    name="title"
+                    placeholder="Project title, e.g. Neon Skyline"
+                    required
+                    className="rounded-lg border border-border bg-background/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
+                  />
+                </div>
+                <div className="sm:w-56">
+                  <NewProjectStyleField />
+                </div>
+              </div>
               <button
                 type="submit"
                 className="btn-primary flex w-fit items-center gap-1.5 rounded-full px-5 py-2 text-sm font-medium text-white"

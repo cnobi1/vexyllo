@@ -76,6 +76,13 @@ const ICONS: Record<string, (props: SVGProps<SVGSVGElement>) => ReactNode> = {
       <path d="M10 18h11" />
     </Icon>
   ),
+  billing: (props) => (
+    <Icon {...props}>
+      <rect x="2.5" y="5" width="19" height="14" rx="2" />
+      <path d="M2.5 10h19" />
+      <path d="M6 15h4" />
+    </Icon>
+  ),
 };
 
 const NAV_ITEMS = [
@@ -147,6 +154,28 @@ export function SideNav({
           </Link>
         );
       })}
+
+      {/* Not part of NAV_ITEMS — /billing is a top-level route, not scoped
+          under this project (base + href wouldn't apply). */}
+      <BillingLink onNavigate={onNavigate} isActive={pathname === "/billing"} />
     </nav>
+  );
+}
+
+function BillingLink({ onNavigate, isActive }: { onNavigate?: () => void; isActive: boolean }) {
+  const BillingIcon = ICONS.billing;
+  return (
+    <Link
+      href="/billing"
+      onClick={onNavigate}
+      className={
+        isActive
+          ? "mt-auto flex items-center gap-3 rounded-lg bg-primary/15 px-2.5 py-2 text-sm font-medium text-foreground"
+          : "mt-auto flex items-center gap-3 rounded-lg px-2.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-surface-hover hover:text-foreground"
+      }
+    >
+      <BillingIcon className={isActive ? "h-[18px] w-[18px] shrink-0 text-primary" : "h-[18px] w-[18px] shrink-0"} />
+      Billing
+    </Link>
   );
 }

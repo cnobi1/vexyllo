@@ -27,7 +27,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex flex-1 flex-col md:flex-row">
-      <div className="flex items-center justify-between gap-3 border-b border-border bg-surface/40 px-4 py-3 md:hidden">
+      <div className="flex items-center justify-between gap-3 px-4 py-3 md:hidden">
         <div className="flex items-center gap-3">
           <button
             type="button"
@@ -85,7 +85,7 @@ export function MarketingShell({ children }: { children: ReactNode }) {
       )}
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <div className="sticky top-0 z-10 hidden items-center justify-end gap-3 border-b border-border bg-background/80 px-6 py-3 backdrop-blur-md md:flex">
+        <div className="sticky top-0 z-10 hidden items-center justify-end gap-3 px-6 py-3 md:flex">
           <Link
             href="/login"
             className="rounded-full border border-border px-4 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-border-strong hover:bg-surface-hover"

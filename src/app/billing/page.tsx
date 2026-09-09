@@ -1,4 +1,5 @@
 import Link from "next/link";
+import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getBillingProvider } from "@/lib/providers/billing";
@@ -40,8 +41,19 @@ export default async function BillingPage({
   const currentPlanId = subscription && isPlanId(subscription.plan) ? subscription.plan : null;
 
   return (
-    <div className="flex flex-1 flex-col">
-      <header className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-background/80 px-6 py-4 backdrop-blur-md">
+    <div className="relative flex flex-1 flex-col">
+      {/* Fixed-height background layer, NOT wrapping the header — the header
+          needs to stay a direct child of this full-page container so its
+          sticky containing block spans the whole page (nesting it inside a
+          hero-only wrapper previously broke stickiness past that wrapper's
+          height). The gradient fade masks the fixed height not lining up
+          exactly with the hero text's natural height. */}
+      <div className="absolute inset-x-0 top-0 -z-10 h-[520px] overflow-hidden">
+        <Image src="/marketing/pricing-hero-bg.jpg" alt="" fill priority sizes="100vw" className="object-cover" />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/55 via-background/80 to-background" />
+      </div>
+
+      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4">
         <Link href="/dashboard">
           <Logo className="h-7 w-auto" />
         </Link>
@@ -53,18 +65,15 @@ export default async function BillingPage({
         </Link>
       </header>
 
-      <section className="relative overflow-hidden">
-        <div className="hero-glow" aria-hidden="true" />
-        <div className="relative mx-auto flex w-full max-w-2xl flex-col items-center gap-4 px-6 py-16 text-center sm:py-20">
-          <h1 className="text-4xl font-bold sm:text-5xl">
-            Simple, <span className="gradient-text">credit-based</span> pricing
-          </h1>
-          <p className="max-w-lg text-sm text-muted sm:text-base">
-            One plan, one credit balance, no per-generation invoices. Pick the plan that matches how much
-            you generate.
-          </p>
-        </div>
-      </section>
+      <div className="relative mx-auto flex w-full max-w-2xl flex-col items-center gap-4 px-6 pb-16 text-center sm:pb-20">
+        <h1 className="text-4xl font-bold sm:text-5xl">
+          Simple, <span className="gradient-text">credit-based</span> pricing
+        </h1>
+        <p className="max-w-lg text-sm text-muted sm:text-base">
+          One plan, one credit balance, no per-generation invoices. Pick the plan that matches how much
+          you generate.
+        </p>
+      </div>
 
       <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-10 px-6 pb-24">
         {isDemo && (
