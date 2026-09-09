@@ -1,9 +1,17 @@
 import type { PlanId } from "@/lib/billing/plans";
+import type { TopUpPackId } from "@/lib/billing/topup-packs";
 
 export interface StartCheckoutInput {
   userId: string;
   email: string;
   plan: PlanId;
+}
+
+/** A top-up isn't a plan (no recurring price, no monthlyCredits shape) — kept as its own input type rather than overloading StartCheckoutInput.plan. */
+export interface StartTopUpCheckoutInput {
+  userId: string;
+  email: string;
+  packId: TopUpPackId;
 }
 
 export interface StartCheckoutResult {
@@ -22,4 +30,6 @@ export interface BillingProvider {
   startCheckout(input: StartCheckoutInput): Promise<StartCheckoutResult>;
   /** Cancels at the end of the current billing period — no refund, matches Stripe's default cancellation behavior. */
   cancelSubscription(userId: string): Promise<void>;
+  /** One-time credit purchase, independent of the subscription lifecycle — see StartTopUpCheckoutInput. */
+  startTopUpCheckout(input: StartTopUpCheckoutInput): Promise<StartCheckoutResult>;
 }

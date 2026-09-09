@@ -1,7 +1,8 @@
 import Stripe from "stripe";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getPlan } from "@/lib/billing/plans";
-import type { BillingProvider, StartCheckoutInput, StartCheckoutResult } from "./types";
+import { getTopUpPack } from "@/lib/billing/topup-packs";
+import type { BillingProvider, StartCheckoutInput, StartCheckoutResult, StartTopUpCheckoutInput } from "./types";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 // Where Stripe should send the customer back to after Checkout — needs to
@@ -44,6 +45,27 @@ export const stripeBillingAdapter: BillingProvider = {
       // visible from customer.subscription.* events too.
       metadata: { userId: input.userId, plan: plan.id },
       subscription_data: { metadata: { userId: input.userId, plan: plan.id } },
+    });
+    if (!session.url) throw new Error("Stripe did not return a Checkout URL");
+    return { url: session.url };
+  },
+  async startTopUpCheckout(input: StartTopUpCheckoutInput): Promise<StartCheckoutResult> {
+    const pack = getTopUpPack(input.packId);
+    if (!pack.stripePriceId) {
+      throw new Error(`No Stripe price is configured for the "${pack.id}" top-up pack yet.`);
+    }
+    const stripe = getStripeClient();
+    const session = await stripe.checkout.sessions.create({
+      // One-time charge, not a subscription — no subscription_data, and the
+      // webhook branches on this mode to tell the two purchase kinds apart
+      // (see src/app/api/webhooks/stripe/route.ts).
+      mode: "payment",
+      customer_email: input.email,
+      line_items: [{ price: pack.stripePriceId, quantity: 1 }],
+      success_url: `${APP_URL}/billing?topup_success=1`,
+      cancel_url: `${APP_URL}/billing?topup_canceled=1`,
+      client_reference_id: input.userId,
+      metadata: { userId: input.userId, kind: "credit_topup", packId: pack.id, credits: String(pack.credits) },
     });
     if (!session.url) throw new Error("Stripe did not return a Checkout URL");
     return { url: session.url };

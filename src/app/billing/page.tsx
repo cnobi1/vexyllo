@@ -3,8 +3,9 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getBillingProvider } from "@/lib/providers/billing";
 import { PLANS, isPlanId } from "@/lib/billing/plans";
+import { TOPUP_PACKS } from "@/lib/billing/topup-packs";
 import { BILLING_FAQS } from "@/lib/billing/faqs";
-import { SubscribeButton, CancelButton } from "./_components/plan-actions";
+import { SubscribeButton, CancelButton, TopUpButton } from "./_components/plan-actions";
 import { Logo } from "../_components/logo";
 import { PlanCard } from "../_components/plan-card";
 
@@ -15,7 +16,13 @@ const STATUS_STYLE: Record<string, string> = {
   canceled: "border-danger/30 bg-danger/10 text-danger",
 };
 
-export default async function BillingPage() {
+export default async function BillingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ topup_success?: string; topup_canceled?: string; demo?: string }>;
+}) {
+  const { topup_success: topUpSuccess, topup_canceled: topUpCanceled, demo } = await searchParams;
+
   const supabase = await createClient();
   const {
     data: { user },
@@ -70,6 +77,17 @@ export default async function BillingPage() {
           </div>
         )}
 
+        {(topUpSuccess || demo === "topup") && (
+          <div className="rounded-2xl border border-success/30 bg-success/10 px-5 py-4 text-sm text-success">
+            Credits added to your balance.
+          </div>
+        )}
+        {topUpCanceled && (
+          <div className="rounded-2xl border border-border bg-background/40 px-5 py-4 text-sm text-muted">
+            Top-up canceled — no charge was made.
+          </div>
+        )}
+
         <section className="card-glow flex flex-col gap-4 rounded-2xl p-6">
           <h2 className="text-base font-semibold text-foreground">Current plan</h2>
           {subscription ? (
@@ -110,6 +128,30 @@ export default async function BillingPage() {
             </div>
           )}
         </section>
+
+        {subscription && (
+          <section className="card-glow flex flex-col gap-4 rounded-2xl p-6">
+            <div>
+              <h2 className="text-base font-semibold text-foreground">Top up credits</h2>
+              <p className="mt-1 text-sm text-muted">
+                Need more before your next renewal? Buy extra credits on top of your plan — they never expire and
+                stack with your monthly refill.
+              </p>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              {TOPUP_PACKS.map((pack) => (
+                <div key={pack.id} className="flex flex-col gap-3 rounded-xl border border-border p-4">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">{pack.name}</p>
+                    <p className="text-xs text-muted">{pack.credits} credits</p>
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">${pack.priceUsd}</p>
+                  <TopUpButton packId={pack.id} />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="flex flex-col gap-6">
           <h2 className="text-base font-semibold text-foreground">Plans</h2>

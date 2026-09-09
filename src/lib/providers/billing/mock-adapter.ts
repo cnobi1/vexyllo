@@ -1,6 +1,7 @@
 import { createServiceClient } from "@/lib/supabase/service";
 import { getPlan } from "@/lib/billing/plans";
-import type { BillingProvider, StartCheckoutInput, StartCheckoutResult } from "./types";
+import { getTopUpPack } from "@/lib/billing/topup-packs";
+import type { BillingProvider, StartCheckoutInput, StartCheckoutResult, StartTopUpCheckoutInput } from "./types";
 
 const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 
@@ -44,6 +45,20 @@ export const mockBillingAdapter: BillingProvider = {
     if (ledgerError) throw new Error(ledgerError.message);
 
     return { url: "/billing?demo=subscribed" };
+  },
+  async startTopUpCheckout(input: StartTopUpCheckoutInput): Promise<StartCheckoutResult> {
+    const pack = getTopUpPack(input.packId);
+    const supabase = createServiceClient();
+
+    // No subscriptions upsert here — a top-up doesn't touch plan/status,
+    // only the credit balance (and only works if a subscriptions row
+    // already exists; see the ledger trigger's user_id match).
+    const { error } = await supabase
+      .from("credits_ledger")
+      .insert({ user_id: input.userId, amount: pack.credits, reason: "credit_topup" });
+    if (error) throw new Error(error.message);
+
+    return { url: "/billing?demo=topup" };
   },
   async cancelSubscription(userId: string): Promise<void> {
     const supabase = createServiceClient();

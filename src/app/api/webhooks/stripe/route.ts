@@ -75,6 +75,21 @@ export async function POST(request: Request) {
     case "checkout.session.completed": {
       const session = event.data.object as Stripe.Checkout.Session;
       const userId = session.client_reference_id;
+
+      // One-time credit top-up ("payment" mode) — handled entirely
+      // separately from the subscription-checkout logic below, which hard-
+      // requires session.subscription and would otherwise silently no-op on
+      // a payment-mode session (it has no subscription to read).
+      if (session.mode === "payment" && session.metadata?.kind === "credit_topup") {
+        const credits = Number(session.metadata?.credits);
+        if (!userId || !credits) break;
+        const { error: topUpError } = await supabase
+          .from("credits_ledger")
+          .insert({ user_id: userId, amount: credits, reason: "credit_topup", stripe_event_id: event.id });
+        if (topUpError && !isDuplicateEventError(topUpError)) throw new Error(topUpError.message);
+        break;
+      }
+
       const planId = session.metadata?.plan;
       const customerId = typeof session.customer === "string" ? session.customer : session.customer?.id;
       const subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id;
