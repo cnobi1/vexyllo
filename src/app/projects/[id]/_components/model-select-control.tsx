@@ -5,6 +5,7 @@ export interface ModelOption {
   id: string;
   displayName: string;
   description?: string | null;
+  providerKey: "byteplus" | "gateway" | "alibaba" | "mock";
   allowedDurations?: { min: number; max: number } | null;
   allowedResolutions?: string[] | null;
   allowedRatios?: string[] | null;
@@ -14,6 +15,16 @@ export interface ModelOption {
   creditsPerSecond: number | null;
   resolutionCostMultiplier: Record<string, number> | null;
   creditsPerReferenceImage: number | null;
+}
+
+/**
+ * Initial <select> value for a model list: the first non-mock option, same
+ * "real provider always outranks the dev fallback" rule as the server's
+ * loadDefaultActiveModel (src/lib/billing/resolve-model.ts) — mock only wins
+ * here if it's the sole active option for the capability.
+ */
+export function pickDefaultModelId(options: ModelOption[]): string {
+  return (options.find((option) => option.providerKey !== "mock") ?? options[0])?.id ?? "";
 }
 
 // A <select> rather than the button-row pattern ResolutionControl/RatioControl

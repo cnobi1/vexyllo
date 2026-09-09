@@ -9,7 +9,7 @@ import { QuantityControl } from "../_components/quantity-control";
 import { RatioControl } from "../_components/ratio-control";
 import { DurationControl } from "../_components/duration-control";
 import { ResolutionControl } from "../_components/resolution-control";
-import { ModelSelectControl, type ModelOption } from "../_components/model-select-control";
+import { ModelSelectControl, pickDefaultModelId, type ModelOption } from "../_components/model-select-control";
 import type { CharacterOption } from "../_components/character-picker";
 import { PromptMentionField, extractMentionedAssetIds, type MentionAssetOption } from "../_components/prompt-mention-field";
 
@@ -46,7 +46,7 @@ export function ImageGenerateForm({
   const [prompt, setPrompt] = useState("");
   const [quantity, setQuantity] = useState(1);
   const [ratio, setRatio] = useState("16:9");
-  const [modelId, setModelId] = useState(imageModels[0]?.id ?? "");
+  const [modelId, setModelId] = useState(pickDefaultModelId(imageModels));
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isUploading, startUploadTransition] = useTransition();
@@ -55,12 +55,13 @@ export function ImageGenerateForm({
   const selectedModel = useMemo(() => imageModels.find((m) => m.id === modelId), [imageModels, modelId]);
 
   const [videoPrompt, setVideoPrompt] = useState("");
-  const [videoModelId, setVideoModelId] = useState(videoModels[0]?.id ?? "");
+  const defaultVideoModel = videoModels.find((m) => m.id === pickDefaultModelId(videoModels));
+  const [videoModelId, setVideoModelId] = useState(defaultVideoModel?.id ?? "");
   const selectedVideoModel = useMemo(
     () => videoModels.find((m) => m.id === videoModelId),
     [videoModels, videoModelId],
   );
-  const [videoDuration, setVideoDuration] = useState(() => Math.min(8, videoModels[0]?.allowedDurations?.max ?? 12));
+  const [videoDuration, setVideoDuration] = useState(() => Math.min(8, defaultVideoModel?.allowedDurations?.max ?? 12));
   const [videoResolution, setVideoResolution] = useState("720p");
   const [videoRatio, setVideoRatio] = useState("16:9");
   const [videoQuantity, setVideoQuantity] = useState(1);

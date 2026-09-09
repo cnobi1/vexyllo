@@ -9,7 +9,7 @@ import { DurationControl } from "../_components/duration-control";
 import { RatioControl } from "../_components/ratio-control";
 import { ResolutionControl } from "../_components/resolution-control";
 import { QuantityControl } from "../_components/quantity-control";
-import { ModelSelectControl, type ModelOption } from "../_components/model-select-control";
+import { ModelSelectControl, pickDefaultModelId, type ModelOption } from "../_components/model-select-control";
 import { GenerationMedia } from "../_components/generation-media";
 import { PromptMentionField, extractMentionedAssetIds, type MentionAssetOption } from "../_components/prompt-mention-field";
 
@@ -121,9 +121,10 @@ export function VideoGenerateForm({
   const [sourceUploadId, setSourceUploadId] = useState<string | undefined>(undefined);
   const [selectedSceneId, setSelectedSceneId] = useState<string | null>(null);
   const [sourcePickerOpen, setSourcePickerOpen] = useState(false);
-  const [modelId, setModelId] = useState(videoModels[0]?.id ?? "");
+  const defaultModel = videoModels.find((m) => m.id === pickDefaultModelId(videoModels));
+  const [modelId, setModelId] = useState(defaultModel?.id ?? "");
   const selectedModel = useMemo(() => videoModels.find((m) => m.id === modelId), [videoModels, modelId]);
-  const [duration, setDuration] = useState(Math.min(8, videoModels[0]?.allowedDurations?.max ?? 12));
+  const [duration, setDuration] = useState(Math.min(8, defaultModel?.allowedDurations?.max ?? 12));
   const [ratio, setRatio] = useState("16:9");
   const [resolution, setResolution] = useState("720p");
   const [quantity, setQuantity] = useState(1);

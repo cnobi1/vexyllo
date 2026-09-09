@@ -44,12 +44,15 @@ function toModel(row: Row): GenerationModel {
 }
 
 /**
- * The catalog's own "pick for me" default — the lowest sort_order active
- * row for a capability (mock rows are seeded at sort_order 0 specifically
- * so this resolves to a working model even with zero provider keys
- * configured). Used by call sites with no model-picker UI of their own,
- * e.g. autofillAssetImages' bulk "generate one for everything missing an
- * image" action.
+ * The catalog's own "pick for me" default — the lowest sort_order *non-mock*
+ * active row for a capability, falling back to mock only if it's the sole
+ * active row. Mock is seeded at sort_order 0 so it wins on a pure sort — that
+ * was fine when it was also the only configured provider, but once a real
+ * key (e.g. BYTEPLUS_API_KEY) goes live, a real model must always outrank it
+ * without an admin having to remember to flip mock's is_active off by hand.
+ * Used by call sites with no model-picker UI of their own, e.g.
+ * autofillAssetImages' bulk "generate one for everything missing an image"
+ * action.
  */
 export async function loadDefaultActiveModel(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -62,13 +65,14 @@ export async function loadDefaultActiveModel(
     )
     .eq("capability", capability)
     .eq("is_active", true)
-    .order("sort_order", { ascending: true })
-    .limit(1)
-    .single();
-  if (error || !data) {
+    .order("sort_order", { ascending: true });
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as Row[];
+  const pick = rows.find((row) => row.provider_key !== "mock") ?? rows[0];
+  if (!pick) {
     throw new Error(`No active ${capability} model is configured.`);
   }
-  return toModel(data as Row);
+  return toModel(pick);
 }
 
 /**
@@ -85,6 +89,7 @@ export async function loadModelOptions(
     id: string;
     displayName: string;
     description: string | null;
+    providerKey: "byteplus" | "gateway" | "alibaba" | "mock";
     allowedDurations: { min: number; max: number } | null;
     allowedResolutions: string[] | null;
     allowedRatios: string[] | null;
@@ -98,7 +103,7 @@ export async function loadModelOptions(
   const { data, error } = await supabase
     .from("generation_models")
     .select(
-      "id, display_name, description, allowed_durations, allowed_resolutions, allowed_ratios, credit_cost_mode, flat_credit_cost, credits_per_second, resolution_cost_multiplier, credits_per_reference_image",
+      "id, display_name, description, provider_key, allowed_durations, allowed_resolutions, allowed_ratios, credit_cost_mode, flat_credit_cost, credits_per_second, resolution_cost_multiplier, credits_per_reference_image",
     )
     .eq("capability", capability)
     .eq("is_active", true)
@@ -109,6 +114,7 @@ export async function loadModelOptions(
     id: row.id,
     displayName: row.display_name,
     description: row.description,
+    providerKey: row.provider_key,
     allowedDurations: row.allowed_durations,
     allowedResolutions: row.allowed_resolutions,
     allowedRatios: row.allowed_ratios,
