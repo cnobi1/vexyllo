@@ -5,8 +5,13 @@ import { createClient } from "@/lib/supabase/server";
 import { extFromContentType } from "@/lib/media/copy-to-storage";
 import { MAX_UPLOAD_BYTES } from "@/lib/media/upload-limits";
 import { loadOwnedProject } from "./project-guard";
+import { runAction } from "./action-result";
 
 export async function createAsset(projectId: string, formData: FormData) {
+  return runAction(() => createAssetImpl(projectId, formData));
+}
+
+async function createAssetImpl(projectId: string, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const type = String(formData.get("type") ?? "character");
   const description = String(formData.get("description") ?? "").trim();
@@ -29,6 +34,10 @@ export async function createAsset(projectId: string, formData: FormData) {
 }
 
 export async function updateAsset(projectId: string, assetId: string, formData: FormData) {
+  return runAction(() => updateAssetImpl(projectId, assetId, formData));
+}
+
+async function updateAssetImpl(projectId: string, assetId: string, formData: FormData) {
   const name = String(formData.get("name") ?? "").trim();
   const description = String(formData.get("description") ?? "").trim();
   if (!name) return;
@@ -55,6 +64,10 @@ export async function updateAsset(projectId: string, assetId: string, formData: 
  * that ever needs to navigate away can still do so itself after this resolves.
  */
 export async function deleteAsset(projectId: string, assetId: string) {
+  return runAction(() => deleteAssetImpl(projectId, assetId));
+}
+
+async function deleteAssetImpl(projectId: string, assetId: string) {
   const supabase = await createClient();
   await loadOwnedProject(supabase, projectId);
 
@@ -164,7 +177,11 @@ export async function setPrimaryAssetImage(projectId: string, assetId: string, a
  * Media/history — deleting it would break that generation's display
  * elsewhere, so it's only demoted, not removed.
  */
-export async function uploadAssetImage(
+export async function uploadAssetImage(projectId: string, assetId: string, formData: FormData) {
+  return runAction(() => uploadAssetImageImpl(projectId, assetId, formData));
+}
+
+async function uploadAssetImageImpl(
   projectId: string,
   assetId: string,
   formData: FormData,

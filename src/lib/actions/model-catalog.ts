@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "./admin-guard";
+import { runAction } from "./action-result";
 
 export interface ModelCatalogInput {
   capability: "image" | "video";
@@ -49,6 +50,10 @@ function toRow(input: ModelCatalogInput) {
 // Both admin roles manage the catalog per the two-tier role split — only
 // managing other admins is Super Admin-only (see admin-admins.ts).
 export async function createModel(input: ModelCatalogInput) {
+  return runAction(() => createModelImpl(input));
+}
+
+async function createModelImpl(input: ModelCatalogInput) {
   const supabase = await createClient();
   await requireAdmin(supabase);
 
@@ -66,6 +71,10 @@ export async function createModel(input: ModelCatalogInput) {
 }
 
 export async function updateModel(id: string, input: ModelCatalogInput) {
+  return runAction(() => updateModelImpl(id, input));
+}
+
+async function updateModelImpl(id: string, input: ModelCatalogInput) {
   const supabase = await createClient();
   await requireAdmin(supabase);
 
@@ -83,6 +92,10 @@ export async function updateModel(id: string, input: ModelCatalogInput) {
 }
 
 export async function setModelActive(id: string, isActive: boolean) {
+  return runAction(() => setModelActiveImpl(id, isActive));
+}
+
+async function setModelActiveImpl(id: string, isActive: boolean) {
   const supabase = await createClient();
   await requireAdmin(supabase);
 
@@ -93,6 +106,10 @@ export async function setModelActive(id: string, isActive: boolean) {
 }
 
 export async function deleteModel(id: string) {
+  return runAction(() => deleteModelImpl(id));
+}
+
+async function deleteModelImpl(id: string) {
   const supabase = await createClient();
   await requireAdmin(supabase);
 

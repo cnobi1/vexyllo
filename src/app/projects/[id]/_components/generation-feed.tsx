@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { deleteGeneration } from "@/lib/actions/media";
+import { isActionError } from "@/lib/actions/action-result";
 import { ConfirmDialog } from "../../../_components/confirm-dialog";
 import { MediaGrid, type MediaGridItem } from "./media-grid";
 
@@ -146,19 +147,19 @@ export function GenerationFeed({
     if (!id) return;
     setConfirmDeleteId(null);
     setDeletingIds((prev) => new Set(prev).add(id));
-    try {
-      await deleteGeneration(projectId, id);
-      // The DELETE realtime event above removes it from `items` once it
-      // arrives — no local removal here, so a failed delete doesn't need
-      // to be rolled back.
-    } catch (err) {
+    const result = await deleteGeneration(projectId, id);
+    if (isActionError(result)) {
       setDeletingIds((prev) => {
         const next = new Set(prev);
         next.delete(id);
         return next;
       });
-      window.alert(err instanceof Error ? err.message : "Failed to delete");
+      window.alert(result.error);
+      return;
     }
+    // The DELETE realtime event above removes it from `items` once it
+    // arrives — no local removal here, so a failed delete doesn't need
+    // to be rolled back.
   }
 
   return (

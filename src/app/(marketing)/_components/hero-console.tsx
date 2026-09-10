@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 import { startProjectFromIdea } from "@/lib/actions/projects";
+import { isActionError } from "@/lib/actions/action-result";
 import { SparkleIcon } from "@/app/_components/sparkle-icon";
 
 const TABS = [
@@ -12,10 +13,27 @@ const TABS = [
 
 export function HeroConsole() {
   const [tab, setTab] = useState<(typeof TABS)[number]["id"]>("script");
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
   const active = TABS.find((t) => t.id === tab)!;
 
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const formData = new FormData(event.currentTarget);
+    setError(null);
+    startTransition(async () => {
+      // startProjectFromIdeaImpl redirects on success (its own thrown
+      // "NEXT_REDIRECT" propagates straight through runAction) — this only
+      // ever resolves to an {error} value for a genuine failure.
+      const result = await startProjectFromIdea(formData);
+      if (isActionError(result)) {
+        setError(result.error);
+      }
+    });
+  }
+
   return (
-    <form action={startProjectFromIdea} className="flex w-full flex-col items-center gap-4">
+    <form onSubmit={handleSubmit} className="flex w-full flex-col items-center gap-4">
       <div className="inline-flex rounded-full border border-border bg-surface/60 p-1">
         {TABS.map((t) => (
           <button
@@ -47,12 +65,14 @@ export function HeroConsole() {
           </span>
           <button
             type="submit"
-            className="btn-primary flex shrink-0 items-center gap-1.5 rounded-full px-5 py-2 text-sm font-medium text-white"
+            disabled={isPending}
+            className="btn-primary flex shrink-0 items-center gap-1.5 rounded-full px-5 py-2 text-sm font-medium text-white disabled:opacity-50"
           >
             <SparkleIcon />
-            Generate
+            {isPending ? "Starting…" : "Generate"}
           </button>
         </div>
+        {error && <p className="mt-2 text-xs text-danger">{error}</p>}
       </div>
     </form>
   );

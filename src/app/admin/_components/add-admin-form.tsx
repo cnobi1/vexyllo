@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { addAdmin } from "@/lib/actions/admin-admins";
+import { isActionError } from "@/lib/actions/action-result";
 import type { AdminRole } from "@/lib/actions/admin-guard";
 
 export function AddAdminForm() {
@@ -19,13 +20,13 @@ export function AddAdminForm() {
       return;
     }
     startTransition(async () => {
-      try {
-        await addAdmin(trimmed, role);
-        setEmail("");
-        setRole("admin");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to add admin");
+      const result = await addAdmin(trimmed, role);
+      if (isActionError(result)) {
+        setError(result.error);
+        return;
       }
+      setEmail("");
+      setRole("admin");
     });
   }
 

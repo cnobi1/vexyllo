@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type ChangeEvent } from "react";
 import { uploadAssetImage } from "@/lib/actions/assets";
+import { isActionError } from "@/lib/actions/action-result";
 
 /**
  * Alternative to AssetGenerateForm for a user who already has a
@@ -19,18 +20,18 @@ export function AssetUploadForm({ projectId, assetId }: { projectId: string; ass
     if (!file) return;
     setError(null);
     startTransition(async () => {
-      try {
-        const formData = new FormData();
-        formData.append("file", file);
-        await uploadAssetImage(projectId, assetId, formData);
-        // The realtime hook behind each card's thumbnail only listens for
-        // generations UPDATE events — an upload has no generation row, so
-        // it wouldn't otherwise be picked up. Same reload workaround
-        // image-generate-form.tsx already uses for the identical reason.
-        window.location.reload();
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to upload image");
+      const formData = new FormData();
+      formData.append("file", file);
+      const result = await uploadAssetImage(projectId, assetId, formData);
+      if (isActionError(result)) {
+        setError(result.error);
+        return;
       }
+      // The realtime hook behind each card's thumbnail only listens for
+      // generations UPDATE events — an upload has no generation row, so
+      // it wouldn't otherwise be picked up. Same reload workaround
+      // image-generate-form.tsx already uses for the identical reason.
+      window.location.reload();
     });
   }
 

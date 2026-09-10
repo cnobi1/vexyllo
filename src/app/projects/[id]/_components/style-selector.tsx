@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { updateProjectStyle } from "@/lib/actions/projects";
+import { isActionError } from "@/lib/actions/action-result";
 import { PRESET_STYLES } from "@/lib/project-styles";
 
 function ChevronIcon({ open }: { open: boolean }) {
@@ -32,12 +33,17 @@ export function StyleSelector({ projectId, currentStyle }: { projectId: string; 
     currentStyle && !PRESET_STYLES.includes(currentStyle) ? currentStyle : "",
   );
   const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState<string | null>(null);
 
   function applyStyle(style: string) {
     setOpen(false);
     setCustomMode(false);
+    setError(null);
     startTransition(async () => {
-      await updateProjectStyle(projectId, style);
+      const result = await updateProjectStyle(projectId, style);
+      if (isActionError(result)) {
+        setError(result.error);
+      }
     });
   }
 
@@ -61,6 +67,7 @@ export function StyleSelector({ projectId, currentStyle }: { projectId: string; 
         <span className="truncate">{isPending ? "Saving…" : label}</span>
         <ChevronIcon open={open} />
       </button>
+      {error && <p className="mt-1 text-xs text-danger">{error}</p>}
 
       {open && (
         <>

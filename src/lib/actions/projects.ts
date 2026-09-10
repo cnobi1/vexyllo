@@ -11,8 +11,13 @@ import { deleteProjectStorage } from "@/lib/media/delete-project-storage";
 import { SCRIPT_CREDIT_COST } from "@/lib/billing/credit-costs";
 import { requireCredits, recordSpend } from "@/lib/billing/spend-credits";
 import { loadOwnedProject } from "./project-guard";
+import { runAction } from "./action-result";
 
 export async function createProject(formData: FormData) {
+  return runAction(() => createProjectImpl(formData));
+}
+
+async function createProjectImpl(formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   if (!title) return;
 
@@ -48,6 +53,10 @@ export async function createProject(formData: FormData) {
  * explicit generate step themselves.
  */
 export async function startProjectFromIdea(formData: FormData) {
+  return runAction(() => startProjectFromIdeaImpl(formData));
+}
+
+async function startProjectFromIdeaImpl(formData: FormData) {
   const idea = String(formData.get("idea") ?? "").trim();
   if (!idea) return;
 
@@ -75,6 +84,10 @@ export async function startProjectFromIdea(formData: FormData) {
 }
 
 export async function updateProject(id: string, formData: FormData) {
+  return runAction(() => updateProjectImpl(id, formData));
+}
+
+async function updateProjectImpl(id: string, formData: FormData) {
   const title = String(formData.get("title") ?? "").trim();
   const scriptText = String(formData.get("script_text") ?? "");
   if (!title) return;
@@ -105,6 +118,10 @@ export async function updateProject(id: string, formData: FormData) {
  * text can never accidentally clobber the style, and vice versa.
  */
 export async function updateProjectStyle(projectId: string, style: string) {
+  return runAction(() => updateProjectStyleImpl(projectId, style));
+}
+
+async function updateProjectStyleImpl(projectId: string, style: string) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -125,6 +142,10 @@ export async function updateProjectStyle(projectId: string, style: string) {
 }
 
 export async function generateScriptFromIdea(id: string, formData: FormData) {
+  return runAction(() => generateScriptFromIdeaImpl(id, formData));
+}
+
+async function generateScriptFromIdeaImpl(id: string, formData: FormData) {
   const idea = String(formData.get("idea") ?? "").trim();
   if (!idea) return;
   const length = formData.get("length") === "feature" ? "feature" : "short";
@@ -163,6 +184,10 @@ export async function generateScriptFromIdea(id: string, formData: FormData) {
 }
 
 export async function enhanceScriptFromUpload(id: string, formData: FormData) {
+  return runAction(() => enhanceScriptFromUploadImpl(id, formData));
+}
+
+async function enhanceScriptFromUploadImpl(id: string, formData: FormData) {
   const file = formData.get("file");
   const pastedScript = String(formData.get("pasted_script") ?? "").trim();
   const instructions = String(formData.get("instructions") ?? "").trim();
@@ -214,6 +239,10 @@ export async function enhanceScriptFromUpload(id: string, formData: FormData) {
 }
 
 export async function editScriptWithAI(id: string, formData: FormData) {
+  return runAction(() => editScriptWithAIImpl(id, formData));
+}
+
+async function editScriptWithAIImpl(id: string, formData: FormData) {
   const instructions = String(formData.get("instructions") ?? "").trim();
   if (!instructions) return;
 
@@ -265,6 +294,10 @@ export async function editScriptWithAI(id: string, formData: FormData) {
 }
 
 export async function restoreOriginalScript(id: string) {
+  return runAction(() => restoreOriginalScriptImpl(id));
+}
+
+async function restoreOriginalScriptImpl(id: string) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -296,6 +329,10 @@ export async function restoreOriginalScript(id: string) {
 }
 
 export async function deleteProject(id: string) {
+  return runAction(() => deleteProjectImpl(id));
+}
+
+async function deleteProjectImpl(id: string) {
   const supabase = await createClient();
   await loadOwnedProject(supabase, id);
 

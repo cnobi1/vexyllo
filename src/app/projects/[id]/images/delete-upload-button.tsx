@@ -2,6 +2,7 @@
 
 import { useTransition } from "react";
 import { deleteUpload } from "@/lib/actions/uploads";
+import { isActionError } from "@/lib/actions/action-result";
 
 export function DeleteUploadButton({ projectId, uploadId }: { projectId: string; uploadId: string }) {
   const [isPending, startTransition] = useTransition();
@@ -12,7 +13,11 @@ export function DeleteUploadButton({ projectId, uploadId }: { projectId: string;
       disabled={isPending}
       onClick={() =>
         startTransition(async () => {
-          await deleteUpload(projectId, uploadId);
+          const result = await deleteUpload(projectId, uploadId);
+          if (isActionError(result)) {
+            window.alert(result.error);
+            return;
+          }
           // See image-generate-form.tsx's handleFileUpload — router.refresh() has proven unreliable here.
           window.location.reload();
         })

@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireAdmin } from "./admin-guard";
+import { runAction } from "./action-result";
 
 export type PendingShowcaseItem = {
   id: string;
@@ -24,6 +25,10 @@ export type PendingShowcaseItem = {
  * migration) is the enforcement point now, not app code.
  */
 export async function saveShowcaseItems(items: PendingShowcaseItem[]) {
+  return runAction(() => saveShowcaseItemsImpl(items));
+}
+
+async function saveShowcaseItemsImpl(items: PendingShowcaseItem[]) {
   const supabase = await createClient();
   await requireAdmin(supabase);
 
@@ -48,6 +53,10 @@ export async function saveShowcaseItems(items: PendingShowcaseItem[]) {
 }
 
 export async function deleteShowcaseItem(id: string) {
+  return runAction(() => deleteShowcaseItemImpl(id));
+}
+
+async function deleteShowcaseItemImpl(id: string) {
   const supabase = await createClient();
   await requireAdmin(supabase);
 

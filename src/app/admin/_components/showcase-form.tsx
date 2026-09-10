@@ -4,6 +4,7 @@ import { useState, useTransition, type ChangeEvent } from "react";
 import { createClient } from "@/lib/supabase/client";
 import { extFromContentType } from "@/lib/media/copy-to-storage";
 import { saveShowcaseItems, type PendingShowcaseItem } from "@/lib/actions/showcase";
+import { isActionError } from "@/lib/actions/action-result";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 45 * 1024 * 1024;
@@ -90,11 +91,10 @@ export function ShowcaseForm() {
       let saveError: string | null = null;
 
       if (uploaded.length > 0) {
-        try {
-          await saveShowcaseItems(uploaded);
-        } catch (err) {
+        const result = await saveShowcaseItems(uploaded);
+        if (isActionError(result)) {
           await supabase.storage.from("showcase").remove(uploaded.map((u) => u.storagePath));
-          saveError = err instanceof Error ? err.message : "Failed to save showcase items";
+          saveError = result.error;
         }
       }
 

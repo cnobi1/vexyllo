@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { createModel, updateModel, deleteModel, setModelActive } from "@/lib/actions/model-catalog";
+import { isActionError } from "@/lib/actions/action-result";
 import { ModelForm, type ModelFormValues } from "./model-form";
 
 export interface AdminModelRow extends ModelFormValues {
@@ -35,7 +36,8 @@ export function ModelsTable({ models }: { models: AdminModelRow[] }) {
           submitLabel="Create model"
           onCancel={() => setAdding(false)}
           onSubmit={async (values) => {
-            await createModel(values);
+            const result = await createModel(values);
+            if (isActionError(result)) throw new Error(result.error);
             setAdding(false);
           }}
         />
@@ -56,7 +58,8 @@ export function ModelsTable({ models }: { models: AdminModelRow[] }) {
                     submitLabel="Save changes"
                     onCancel={() => setEditingId(null)}
                     onSubmit={async (values) => {
-                      await updateModel(model.id, values);
+                      const result = await updateModel(model.id, values);
+                      if (isActionError(result)) throw new Error(result.error);
                       setEditingId(null);
                     }}
                   />
@@ -88,22 +91,19 @@ function ModelRow({ model, onEdit }: { model: AdminModelRow; onEdit: () => void 
   async function toggleActive() {
     setError(null);
     setIsToggling(true);
-    try {
-      await setModelActive(model.id, !model.isActive);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update model");
-    } finally {
-      setIsToggling(false);
+    const result = await setModelActive(model.id, !model.isActive);
+    if (isActionError(result)) {
+      setError(result.error);
     }
+    setIsToggling(false);
   }
 
   async function handleDelete() {
     setError(null);
     setIsDeleting(true);
-    try {
-      await deleteModel(model.id);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to delete model");
+    const result = await deleteModel(model.id);
+    if (isActionError(result)) {
+      setError(result.error);
       setIsDeleting(false);
     }
   }

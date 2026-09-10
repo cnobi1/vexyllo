@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { unstable_rethrow } from "next/navigation";
 import { subscribe, cancelSubscription, topUpCredits } from "@/lib/actions/billing";
+import { isActionError } from "@/lib/actions/action-result";
 import type { PlanId } from "@/lib/billing/plans";
 import type { TopUpPackId } from "@/lib/billing/topup-packs";
 
@@ -44,17 +44,14 @@ export function SubscribeButton({
         onClick={() => {
           setError(null);
           startTransition(async () => {
-            try {
-              await subscribe(planId);
-            } catch (err) {
-              // redirect() throws internally on success (digest
-              // "NEXT_REDIRECT") — unstable_rethrow lets that specific
-              // throw continue on to Next's own navigation handling
-              // instead of being swallowed here as a fake error. Only a
-              // genuine failure (e.g. no Stripe price configured) reaches
-              // setError below.
-              unstable_rethrow(err);
-              setError(err instanceof Error ? err.message : "Failed to start checkout");
+            // On success, subscribeImpl's own redirect() throws internally
+            // (digest "NEXT_REDIRECT") and propagates straight through
+            // runAction (see action-result.ts) — this only ever resolves to
+            // an {error} value for a genuine failure (e.g. no Stripe price
+            // configured).
+            const result = await subscribe(planId);
+            if (isActionError(result)) {
+              setError(result.error);
             }
           });
         }}
@@ -79,12 +76,10 @@ export function TopUpButton({ packId }: { packId: TopUpPackId }) {
         onClick={() => {
           setError(null);
           startTransition(async () => {
-            try {
-              await topUpCredits(packId);
-            } catch (err) {
-              // Same redirect()-throws-internally caveat as SubscribeButton.
-              unstable_rethrow(err);
-              setError(err instanceof Error ? err.message : "Failed to start checkout");
+            // Same redirect()-throws-internally caveat as SubscribeButton.
+            const result = await topUpCredits(packId);
+            if (isActionError(result)) {
+              setError(result.error);
             }
           });
         }}
@@ -109,16 +104,16 @@ export function CancelButton() {
         onClick={() => {
           setError(null);
           startTransition(async () => {
-            try {
-              await cancelSubscription();
-              // See src/app/projects/[id]/images/delete-upload-button.tsx —
-              // router.refresh() after a directly-invoked Server Action has
-              // proven unreliable in this dev setup, and subscriptions isn't
-              // a realtime-published table.
-              window.location.reload();
-            } catch (err) {
-              setError(err instanceof Error ? err.message : "Failed to cancel");
+            const result = await cancelSubscription();
+            if (isActionError(result)) {
+              setError(result.error);
+              return;
             }
+            // See src/app/projects/[id]/images/delete-upload-button.tsx —
+            // router.refresh() after a directly-invoked Server Action has
+            // proven unreliable in this dev setup, and subscriptions isn't
+            // a realtime-published table.
+            window.location.reload();
           });
         }}
         className="rounded-full border border-border px-4 py-1.5 text-sm font-medium text-foreground transition-colors hover:border-border-strong hover:bg-surface-hover disabled:opacity-50"

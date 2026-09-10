@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { updateAsset } from "@/lib/actions/assets";
 import { autofillAssetImages } from "@/lib/actions/media";
+import { useActionForm } from "@/app/_components/use-action-form";
 import { SubmitButton } from "../_components/submit-button";
 import { DeleteAssetButton } from "../_components/delete-asset-button";
 import { ExpandableTextarea } from "../_components/expandable-textarea";
@@ -50,13 +51,7 @@ export function AssetsList({
         <section key={group.type} className="flex flex-col gap-3">
           <div className="flex items-center justify-between gap-2">
             <h3 className="text-sm font-semibold text-foreground">{SECTION_LABEL[group.type] ?? `${group.type}s`}</h3>
-            <form action={autofillAssetImages.bind(null, projectId, group.type)}>
-              <SubmitButton
-                label="✦ Autofill images"
-                pendingLabel="Autofilling…"
-                className="btn-primary rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
-              />
-            </form>
+            <AutofillButton projectId={projectId} type={group.type} />
           </div>
           <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {group.assets.map((asset) => (
@@ -71,6 +66,23 @@ export function AssetsList({
           </ul>
         </section>
       ))}
+    </div>
+  );
+}
+
+function AutofillButton({ projectId, type }: { projectId: string; type: string }) {
+  const [state, formAction] = useActionForm(autofillAssetImages.bind(null, projectId, type));
+
+  return (
+    <div className="flex flex-col items-end gap-1">
+      <form action={formAction}>
+        <SubmitButton
+          label="✦ Autofill images"
+          pendingLabel="Autofilling…"
+          className="btn-primary rounded-full px-5 py-2 text-sm font-semibold text-white disabled:opacity-50"
+        />
+      </form>
+      {state?.error && <p className="text-xs text-danger">{state.error}</p>}
     </div>
   );
 }
@@ -90,6 +102,7 @@ function AssetCard({
   const [showGenerate, setShowGenerate] = useState(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageUrl = useAssetPrimaryImage(projectId, asset.id, initialImageUrl);
+  const [saveState, saveAction] = useActionForm(updateAsset.bind(null, projectId, asset.id));
 
   return (
     <li className="card-glow flex flex-col gap-3 rounded-xl p-4 text-sm">
@@ -135,7 +148,7 @@ function AssetCard({
         </div>
       )}
 
-      <form action={updateAsset.bind(null, projectId, asset.id)} className="flex flex-col gap-2">
+      <form action={saveAction} className="flex flex-col gap-2">
         <input type="hidden" name="name" value={asset.name} />
         <ExpandableTextarea
           ref={textareaRef}
@@ -149,6 +162,7 @@ function AssetCard({
           pendingLabel="Saving…"
           className="self-start rounded-full border border-border-strong bg-primary/10 px-3 py-1 text-xs font-medium text-foreground transition-colors hover:bg-primary/20 disabled:opacity-50"
         />
+        {saveState?.error && <p className="text-xs text-danger">{saveState.error}</p>}
       </form>
     </li>
   );

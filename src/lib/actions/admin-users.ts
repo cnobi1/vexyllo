@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { requireAdmin } from "./admin-guard";
+import { runAction } from "./action-result";
 
 /**
  * Admin-granted credits (goodwill/support credits, not a purchase) can
@@ -16,6 +17,10 @@ import { requireAdmin } from "./admin-guard";
  * elsewhere in the app.
  */
 export async function grantUserCredits(userId: string, amount: number) {
+  return runAction(() => grantUserCreditsImpl(userId, amount));
+}
+
+async function grantUserCreditsImpl(userId: string, amount: number) {
   const supabase = await createClient();
   await requireAdmin(supabase);
 

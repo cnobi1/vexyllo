@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { requireSuperAdmin, type AdminRole } from "./admin-guard";
+import { runAction } from "./action-result";
 
 export interface AdminListRow {
   userId: string;
@@ -34,6 +35,10 @@ export async function listAdmins(): Promise<AdminListRow[]> {
 }
 
 export async function addAdmin(email: string, role: AdminRole) {
+  return runAction(() => addAdminImpl(email, role));
+}
+
+async function addAdminImpl(email: string, role: AdminRole) {
   const supabase = await createClient();
   await requireSuperAdmin(supabase);
 
@@ -47,6 +52,10 @@ export async function addAdmin(email: string, role: AdminRole) {
 }
 
 export async function updateAdminRole(userId: string, role: AdminRole) {
+  return runAction(() => updateAdminRoleImpl(userId, role));
+}
+
+async function updateAdminRoleImpl(userId: string, role: AdminRole) {
   const supabase = await createClient();
   await requireSuperAdmin(supabase);
 
@@ -57,6 +66,10 @@ export async function updateAdminRole(userId: string, role: AdminRole) {
 }
 
 export async function removeAdmin(userId: string) {
+  return runAction(() => removeAdminImpl(userId));
+}
+
+async function removeAdminImpl(userId: string) {
   const supabase = await createClient();
   await requireSuperAdmin(supabase);
 

@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { extFromContentType } from "@/lib/media/copy-to-storage";
 import { MAX_UPLOAD_BYTES } from "@/lib/media/upload-limits";
 import { loadOwnedProject } from "./project-guard";
+import { runAction } from "./action-result";
 
 /**
  * Returns the uploaded image's URL directly to the caller rather than
@@ -12,7 +13,11 @@ import { loadOwnedProject } from "./project-guard";
  * following "turn into video" step needs it without waiting on a
  * server-rendered page re-fetch.
  */
-export async function uploadImage(projectId: string, formData: FormData): Promise<{ uploadId: string; url: string }> {
+export async function uploadImage(projectId: string, formData: FormData) {
+  return runAction(() => uploadImageImpl(projectId, formData));
+}
+
+async function uploadImageImpl(projectId: string, formData: FormData): Promise<{ uploadId: string; url: string }> {
   const supabase = await createClient();
   await loadOwnedProject(supabase, projectId);
 
@@ -62,6 +67,10 @@ export async function uploadImage(projectId: string, formData: FormData): Promis
 }
 
 export async function deleteUpload(projectId: string, uploadId: string) {
+  return runAction(() => deleteUploadImpl(projectId, uploadId));
+}
+
+async function deleteUploadImpl(projectId: string, uploadId: string) {
   const supabase = await createClient();
   await loadOwnedProject(supabase, projectId);
 

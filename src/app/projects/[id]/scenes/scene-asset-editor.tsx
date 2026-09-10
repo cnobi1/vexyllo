@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { addSceneAsset, removeSceneAsset } from "@/lib/actions/scenes";
+import { isActionError } from "@/lib/actions/action-result";
 import { CharacterPicker, type CharacterOption } from "../_components/character-picker";
 
 /**
@@ -35,14 +36,14 @@ export function SceneAssetEditor({
     setError(null);
 
     startTransition(async () => {
-      try {
-        await Promise.all([
-          ...added.map((assetId) => addSceneAsset(projectId, sceneId, assetId)),
-          ...removed.map((assetId) => removeSceneAsset(projectId, sceneId, assetId)),
-        ]);
-      } catch (err) {
+      const results = await Promise.all([
+        ...added.map((assetId) => addSceneAsset(projectId, sceneId, assetId)),
+        ...removed.map((assetId) => removeSceneAsset(projectId, sceneId, assetId)),
+      ]);
+      const failed = results.find(isActionError);
+      if (failed) {
         setSelectedIds(previousIds);
-        setError(err instanceof Error ? err.message : "Failed to update scene assets.");
+        setError(failed.error);
       }
     });
   }

@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { getPlan, isPlanId } from "@/lib/billing/plans";
 import { grantUserCredits } from "@/lib/actions/admin-users";
+import { isActionError } from "@/lib/actions/action-result";
 
 export type AdminUser = {
   userId: string;
@@ -64,12 +65,12 @@ function UserRow({ user }: { user: AdminUser }) {
       return;
     }
     startTransition(async () => {
-      try {
-        await grantUserCredits(user.userId, parsed);
-        setAmount("");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to add credits");
+      const result = await grantUserCredits(user.userId, parsed);
+      if (isActionError(result)) {
+        setError(result.error);
+        return;
       }
+      setAmount("");
     });
   }
 

@@ -16,6 +16,7 @@ import { requireCredits, recordSpend } from "@/lib/billing/spend-credits";
 import { loadActiveModel, loadDefaultActiveModel } from "@/lib/billing/resolve-model";
 import { withTransientRetry } from "@/lib/providers/retry";
 import { loadOwnedProject } from "./project-guard";
+import { runAction } from "./action-result";
 
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
@@ -127,68 +128,70 @@ export async function generateFreeformImages(
     modelId: string;
   },
 ) {
-  const supabase = await createClient();
-  const project = await loadOwnedProject(supabase, projectId);
-  const model = await loadActiveModel(supabase, input.modelId, "image");
-  const provider = getImageProvider(model.providerKey);
+  return runAction(async () => {
+    const supabase = await createClient();
+    const project = await loadOwnedProject(supabase, projectId);
+    const model = await loadActiveModel(supabase, input.modelId, "image");
+    const provider = getImageProvider(model.providerKey);
 
-  const assetReferenceImageUrls = input.referenceAssetIds?.length
-    ? await resolveAssetReferenceUrls(supabase, projectId, input.referenceAssetIds, input.referenceImageOverrides)
-    : undefined;
-  const referenceImageUrls = [...(assetReferenceImageUrls ?? []), ...(input.extraReferenceImageUrls ?? [])];
+    const assetReferenceImageUrls = input.referenceAssetIds?.length
+      ? await resolveAssetReferenceUrls(supabase, projectId, input.referenceAssetIds, input.referenceImageOverrides)
+      : undefined;
+    const referenceImageUrls = [...(assetReferenceImageUrls ?? []), ...(input.extraReferenceImageUrls ?? [])];
 
-  const quantity = clampQuantity(input.quantity);
-  const creditCost = computeCreditCost(model);
-  await requireCredits(project.userId, creditCost * quantity);
+    const quantity = clampQuantity(input.quantity);
+    const creditCost = computeCreditCost(model);
+    await requireCredits(project.userId, creditCost * quantity);
 
-  const batchId = crypto.randomUUID();
-  const rows = await insertGenerationBatch(supabase, {
-    projectId,
-    kind: "freeform_image",
-    provider: provider.name,
-    model: model.providerModelId,
-    batchId,
-    quantity,
-    params: {
-      prompt: input.prompt,
-      ratio: input.ratio ?? null,
+    const batchId = crypto.randomUUID();
+    const rows = await insertGenerationBatch(supabase, {
+      projectId,
+      kind: "freeform_image",
+      provider: provider.name,
+      model: model.providerModelId,
+      batchId,
       quantity,
-      referenceAssetIds: input.referenceAssetIds ?? [],
-      referenceImageOverrides: input.referenceImageOverrides ?? {},
-      extraReferenceImageUrls: input.extraReferenceImageUrls ?? [],
-    },
-  });
+      params: {
+        prompt: input.prompt,
+        ratio: input.ratio ?? null,
+        quantity,
+        referenceAssetIds: input.referenceAssetIds ?? [],
+        referenceImageOverrides: input.referenceImageOverrides ?? {},
+        extraReferenceImageUrls: input.extraReferenceImageUrls ?? [],
+      },
+    });
 
-  after(async () => {
-    // Fresh client: this runs after the response is sent. See generations.ts.
-    const worker = await createClient();
-    try {
-      const result = await withTransientRetry(() =>
-        provider.generateImage({
-          prompt: input.prompt,
-          style: project.style,
-          referenceImageUrls: referenceImageUrls.length > 0 ? referenceImageUrls : undefined,
-          quantity,
-          ratio: input.ratio,
-          modelId: model.providerModelId,
-        }),
-      );
-      // settleImageBatch charges each row only as it confirms success.
-      await settleImageBatch(worker, projectId, project.userId, creditCost, rows, result.images);
-    } catch (err) {
-      // Only rows settleImageBatch never got to (still "pending") get
-      // marked failed here — rows it already settled have their own status
-      // and must not be touched twice. Nothing was charged for any of
-      // these, so there's nothing to refund.
-      await worker
-        .from("generations")
-        .update({ status: "failed", error: errorMessage(err) })
-        .in(
-          "id",
-          rows.map((r) => r.id),
-        )
-        .eq("status", "pending");
-    }
+    after(async () => {
+      // Fresh client: this runs after the response is sent. See generations.ts.
+      const worker = await createClient();
+      try {
+        const result = await withTransientRetry(() =>
+          provider.generateImage({
+            prompt: input.prompt,
+            style: project.style,
+            referenceImageUrls: referenceImageUrls.length > 0 ? referenceImageUrls : undefined,
+            quantity,
+            ratio: input.ratio,
+            modelId: model.providerModelId,
+          }),
+        );
+        // settleImageBatch charges each row only as it confirms success.
+        await settleImageBatch(worker, projectId, project.userId, creditCost, rows, result.images);
+      } catch (err) {
+        // Only rows settleImageBatch never got to (still "pending") get
+        // marked failed here — rows it already settled have their own status
+        // and must not be touched twice. Nothing was charged for any of
+        // these, so there's nothing to refund.
+        await worker
+          .from("generations")
+          .update({ status: "failed", error: errorMessage(err) })
+          .in(
+            "id",
+            rows.map((r) => r.id),
+          )
+          .eq("status", "pending");
+      }
+    });
   });
 }
 
@@ -201,6 +204,14 @@ export async function generateCharacterSheet(
   // picker in the UI — omit it to fall through to the catalog's own default
   // (lowest sort_order active image model), same one the picker itself
   // defaults to.
+  input: { prompt: string; quantity: number; ratio?: string; modelId?: string },
+) {
+  return runAction(() => generateCharacterSheetImpl(projectId, assetId, input));
+}
+
+async function generateCharacterSheetImpl(
+  projectId: string,
+  assetId: string,
   input: { prompt: string; quantity: number; ratio?: string; modelId?: string },
 ) {
   const supabase = await createClient();
@@ -324,6 +335,10 @@ export async function generateCharacterSheet(
  * storyboard panels, not square/portrait crops.
  */
 export async function autofillAssetImages(projectId: string, type: string) {
+  return runAction(() => autofillAssetImagesImpl(projectId, type));
+}
+
+async function autofillAssetImagesImpl(projectId: string, type: string) {
   const supabase = await createClient();
   await loadOwnedProject(supabase, projectId);
 
@@ -335,12 +350,15 @@ export async function autofillAssetImages(projectId: string, type: string) {
 
   const targets = (assets ?? []).filter((asset) => !asset.reference_image_url);
 
-  // No model-picker UI on this bulk action — generateCharacterSheet falls
+  // No model-picker UI on this bulk action — generateCharacterSheetImpl falls
   // through to the catalog's own default (lowest sort_order active image
-  // model) when modelId is omitted.
+  // model) when modelId is omitted. Calls the un-wrapped Impl directly (not
+  // the exported generateCharacterSheet) so a failure on one asset rejects
+  // this Promise.all and surfaces through this action's own runAction
+  // wrapper, instead of resolving to a swallowed {error} value per asset.
   await Promise.all(
     targets.map((asset) =>
-      generateCharacterSheet(projectId, asset.id, {
+      generateCharacterSheetImpl(projectId, asset.id, {
         prompt: asset.description?.trim() || asset.name,
         quantity: 1,
         ratio: "16:9",
@@ -368,6 +386,13 @@ export async function generateVideoFromImage(
     quantity?: number;
     modelId: string;
   },
+) {
+  return runAction(() => generateVideoFromImageImpl(projectId, input));
+}
+
+async function generateVideoFromImageImpl(
+  projectId: string,
+  input: Parameters<typeof generateVideoFromImage>[1],
 ) {
   if (!input.sourceUrl && !input.referenceAssetIds?.length) {
     throw new Error("Provide a source image or at least one reference character.");
@@ -466,6 +491,10 @@ export async function generateVideoFromImage(
  * UI without a page refresh.
  */
 export async function deleteGeneration(projectId: string, generationId: string) {
+  return runAction(() => deleteGenerationImpl(projectId, generationId));
+}
+
+async function deleteGenerationImpl(projectId: string, generationId: string) {
   const supabase = await createClient();
   await loadOwnedProject(supabase, projectId);
 

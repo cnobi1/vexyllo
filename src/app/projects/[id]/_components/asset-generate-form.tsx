@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { generateCharacterSheet } from "@/lib/actions/media";
+import { isActionError } from "@/lib/actions/action-result";
 import { IMAGE_CREDIT_COST } from "@/lib/billing/credit-costs";
 import { QuantityControl } from "./quantity-control";
 
@@ -41,15 +42,15 @@ export function AssetGenerateForm({
     if (!prompt.trim()) return;
     setError(null);
     startTransition(async () => {
-      try {
-        // Scenes > Assets reference boards default to 16:9 — a fixed
-        // storyboard-panel aspect, not user-configurable here (no ratio
-        // control in this form).
-        await generateCharacterSheet(projectId, assetId, { prompt, quantity, ratio: "16:9" });
-        setPrompt("");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to start generation");
+      // Scenes > Assets reference boards default to 16:9 — a fixed
+      // storyboard-panel aspect, not user-configurable here (no ratio
+      // control in this form).
+      const result = await generateCharacterSheet(projectId, assetId, { prompt, quantity, ratio: "16:9" });
+      if (isActionError(result)) {
+        setError(result.error);
+        return;
       }
+      setPrompt("");
     });
   }
 

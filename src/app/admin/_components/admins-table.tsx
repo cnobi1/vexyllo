@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { removeAdmin, updateAdminRole, type AdminListRow } from "@/lib/actions/admin-admins";
+import { isActionError } from "@/lib/actions/action-result";
 import type { AdminRole } from "@/lib/actions/admin-guard";
 
 const dateFormatter = new Intl.DateTimeFormat("en-US", { dateStyle: "medium" });
@@ -39,10 +40,9 @@ function AdminRow({ admin, isSelf }: { admin: AdminListRow; isSelf: boolean }) {
   function handleRoleChange(role: AdminRole) {
     setError(null);
     startTransition(async () => {
-      try {
-        await updateAdminRole(admin.userId, role);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to update role");
+      const result = await updateAdminRole(admin.userId, role);
+      if (isActionError(result)) {
+        setError(result.error);
       }
     });
   }
@@ -50,10 +50,9 @@ function AdminRow({ admin, isSelf }: { admin: AdminListRow; isSelf: boolean }) {
   function handleRemove() {
     setError(null);
     startTransition(async () => {
-      try {
-        await removeAdmin(admin.userId);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to remove admin");
+      const result = await removeAdmin(admin.userId);
+      if (isActionError(result)) {
+        setError(result.error);
       }
     });
   }

@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { deleteShowcaseItem } from "@/lib/actions/showcase";
+import { isActionError } from "@/lib/actions/action-result";
 import { ConfirmDialog } from "../../_components/confirm-dialog";
 
 export type ShowcaseItem = {
@@ -45,12 +46,17 @@ export function ShowcaseTable({ items, emptyLabel }: { items: ShowcaseItem[]; em
 
 function ShowcaseRow({ item }: { item: ShowcaseItem }) {
   const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   function handleConfirm() {
     setConfirming(false);
+    setError(null);
     startTransition(async () => {
-      await deleteShowcaseItem(item.id);
+      const result = await deleteShowcaseItem(item.id);
+      if (isActionError(result)) {
+        setError(result.error);
+      }
     });
   }
 
@@ -78,6 +84,7 @@ function ShowcaseRow({ item }: { item: ShowcaseItem }) {
         >
           {isPending ? "Deleting…" : "Delete"}
         </button>
+        {error && <p className="mt-1 text-xs text-danger">{error}</p>}
         {confirming && (
           <ConfirmDialog
             title="Delete this showcase item?"

@@ -1,7 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useState, useTransition } from "react";
 import { deleteProject } from "@/lib/actions/projects";
+import { isActionError } from "@/lib/actions/action-result";
 import { ConfirmDialog } from "./confirm-dialog";
 
 function TrashIcon() {
@@ -17,40 +18,51 @@ function TrashIcon() {
 }
 
 /**
- * A per-card delete affordance for the home page's project grid. Submits
- * through a real <form action={deleteProject}> (same mechanism as the
- * project sidebar's own delete button) rather than calling the server
- * action directly from a click handler, so deleteProject's redirect("/")
- * is handled the same proven way in both places. The confirm step matters
- * more here than in the sidebar: this button sits on a dense grid of other
- * projects, one misclick away, rather than behind a dedicated project page.
+ * A per-card delete affordance for the home page's project grid. The confirm
+ * step matters more here than elsewhere: this button sits on a dense grid of
+ * other projects, one misclick away, rather than behind a dedicated project page.
  */
 export function DeleteProjectButton({ projectId, projectTitle }: { projectId: string; projectTitle: string }) {
   const [confirming, setConfirming] = useState(false);
-  const formRef = useRef<HTMLFormElement>(null);
-  const deleteProjectWithId = deleteProject.bind(null, projectId);
+  const [error, setError] = useState<string | null>(null);
+  const [isPending, startTransition] = useTransition();
+
+  function handleConfirm() {
+    setConfirming(false);
+    setError(null);
+    startTransition(async () => {
+      // deleteProjectImpl redirects to /dashboard on success (its own
+      // thrown "NEXT_REDIRECT" propagates straight through runAction) —
+      // this only ever resolves to an {error} value for a genuine failure.
+      const result = await deleteProject(projectId);
+      if (isActionError(result)) {
+        setError(result.error);
+      }
+    });
+  }
 
   return (
     <>
-      <form ref={formRef} action={deleteProjectWithId}>
-        <button
-          type="button"
-          onClick={() => setConfirming(true)}
-          aria-label={`Delete ${projectTitle}`}
-          className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-background/80 text-muted opacity-0 backdrop-blur-sm transition-opacity hover:bg-danger/10 hover:text-danger group-hover:opacity-100"
-        >
-          <TrashIcon />
-        </button>
-      </form>
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={() => setConfirming(true)}
+        aria-label={`Delete ${projectTitle}`}
+        className="absolute right-3 top-3 z-10 flex h-8 w-8 items-center justify-center rounded-lg bg-background/80 text-muted opacity-0 backdrop-blur-sm transition-opacity hover:bg-danger/10 hover:text-danger group-hover:opacity-100 disabled:opacity-50"
+      >
+        <TrashIcon />
+      </button>
+      {error && (
+        <p className="absolute right-3 top-14 z-10 max-w-[200px] rounded-lg bg-background/90 px-2 py-1 text-xs text-danger backdrop-blur-sm">
+          {error}
+        </p>
+      )}
       {confirming && (
         <ConfirmDialog
           title="Delete this project?"
           description={`This permanently deletes "${projectTitle}" and everything in it — scenes, characters, generated images and videos, uploads. This can't be undone.`}
           confirmLabel="Delete"
-          onConfirm={() => {
-            setConfirming(false);
-            formRef.current?.requestSubmit();
-          }}
+          onConfirm={handleConfirm}
           onCancel={() => setConfirming(false)}
         />
       )}

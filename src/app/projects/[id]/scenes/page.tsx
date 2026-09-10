@@ -1,8 +1,7 @@
 import { notFound } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { generateSceneBreakdown } from "@/lib/actions/scenes";
-import { GenerateButton } from "./submit-button";
+import { GenerateBreakdownForm } from "./generate-breakdown-form";
 import { SceneList } from "./scene-list";
 import { SceneTabs } from "./scene-tabs";
 import { AssetsList } from "./assets-list";
@@ -81,33 +80,15 @@ export default async function ScenesPage({
     .order("order_index", { ascending: true });
 
   const hasScenes = Boolean(scenes && scenes.length > 0);
-  const generateSceneBreakdownWithId = generateSceneBreakdown.bind(null, project.id);
 
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-6 py-10">
       {hasScript ? (
-        <form action={generateSceneBreakdownWithId} className="card-glow flex flex-col gap-3 rounded-2xl p-6">
-          <h2 className="text-base font-semibold text-foreground">Generate Scenes</h2>
-          <p className="text-sm text-muted">
-            {hasScenes
-              ? "Regenerating replaces the current scene breakdown with a fresh one from the script. Existing characters, locations, and props are matched by name and keep their reference images — only ones no longer in the script are removed."
-              : "Break this project's script down into a scene-by-scene breakdown sheet: each scene's full text, estimated screen time, and the characters (with wardrobe notes), locations, and props it contains. Every scene is kept between 10 and 30 seconds of screen time — a longer beat is automatically split across sequential scenes, and a shorter one is combined with its neighbor."}
-          </p>
-          <label className="flex items-center gap-2 text-sm text-muted">
-            Target scene duration
-            <input
-              type="number"
-              name="targetSceneDurationSeconds"
-              min={10}
-              max={30}
-              defaultValue={project.target_scene_duration_seconds ?? ""}
-              placeholder="10-30"
-              className="w-20 rounded-lg border border-border bg-background/60 px-2 py-1 text-sm text-foreground outline-none focus:border-border-strong"
-            />
-            seconds (optional, 10-30)
-          </label>
-          <GenerateButton hasScenes={hasScenes} />
-        </form>
+        <GenerateBreakdownForm
+          projectId={project.id}
+          hasScenes={hasScenes}
+          targetSceneDurationSeconds={project.target_scene_duration_seconds}
+        />
       ) : (
         <div className="card-glow flex flex-col gap-3 rounded-2xl p-6">
           <h2 className="text-base font-semibold text-foreground">Generate Scenes</h2>

@@ -14,8 +14,13 @@ import {
 } from "@/lib/scripts/enforce-scene-duration-range";
 import { BREAKDOWN_CREDIT_COST } from "@/lib/billing/credit-costs";
 import { requireCredits, recordSpend } from "@/lib/billing/spend-credits";
+import { runAction } from "./action-result";
 
 export async function generateSceneBreakdown(projectId: string, formData: FormData) {
+  return runAction(() => generateSceneBreakdownImpl(projectId, formData));
+}
+
+async function generateSceneBreakdownImpl(projectId: string, formData: FormData) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -224,6 +229,10 @@ export async function generateSceneBreakdown(projectId: string, formData: FormDa
  * uses.
  */
 export async function addSceneAsset(projectId: string, sceneId: string, assetId: string) {
+  return runAction(() => addSceneAssetImpl(projectId, sceneId, assetId));
+}
+
+async function addSceneAssetImpl(projectId: string, sceneId: string, assetId: string) {
   const supabase = await createClient();
   const {
     data: { user },
@@ -273,6 +282,10 @@ export async function addSceneAsset(projectId: string, sceneId: string, assetId:
 }
 
 export async function removeSceneAsset(projectId: string, sceneId: string, assetId: string) {
+  return runAction(() => removeSceneAssetImpl(projectId, sceneId, assetId));
+}
+
+async function removeSceneAssetImpl(projectId: string, sceneId: string, assetId: string) {
   const supabase = await createClient();
   const {
     data: { user },

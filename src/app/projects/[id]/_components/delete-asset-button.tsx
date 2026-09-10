@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { deleteAsset } from "@/lib/actions/assets";
+import { isActionError } from "@/lib/actions/action-result";
 import { ConfirmDialog } from "../../../_components/confirm-dialog";
 
 export function DeleteAssetButton({
@@ -20,13 +21,19 @@ export function DeleteAssetButton({
   className?: string;
 }) {
   const [confirming, setConfirming] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
 
   function handleConfirm() {
     setConfirming(false);
+    setError(null);
     startTransition(async () => {
-      await deleteAsset(projectId, assetId);
+      const result = await deleteAsset(projectId, assetId);
+      if (isActionError(result)) {
+        setError(result.error);
+        return;
+      }
       if (redirectTo) {
         router.push(redirectTo);
       }
@@ -46,6 +53,7 @@ export function DeleteAssetButton({
       >
         {isPending ? "Deleting…" : label}
       </button>
+      {error && <p className="text-sm text-danger">{error}</p>}
       {confirming && (
         <ConfirmDialog
           title="Delete this asset?"

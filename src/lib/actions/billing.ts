@@ -6,8 +6,13 @@ import { createClient } from "@/lib/supabase/server";
 import { getBillingProvider } from "@/lib/providers/billing";
 import { isPlanId } from "@/lib/billing/plans";
 import { isTopUpPackId } from "@/lib/billing/topup-packs";
+import { runAction } from "./action-result";
 
 export async function subscribe(plan: string) {
+  return runAction(() => subscribeImpl(plan));
+}
+
+async function subscribeImpl(plan: string) {
   if (!isPlanId(plan)) {
     throw new Error(`Unknown plan: ${plan}`);
   }
@@ -27,6 +32,10 @@ export async function subscribe(plan: string) {
 }
 
 export async function topUpCredits(packId: string) {
+  return runAction(() => topUpCreditsImpl(packId));
+}
+
+async function topUpCreditsImpl(packId: string) {
   if (!isTopUpPackId(packId)) {
     throw new Error(`Unknown top-up pack: ${packId}`);
   }
@@ -58,6 +67,10 @@ export async function topUpCredits(packId: string) {
 }
 
 export async function cancelSubscription() {
+  return runAction(() => cancelSubscriptionImpl());
+}
+
+async function cancelSubscriptionImpl() {
   const supabase = await createClient();
   const {
     data: { user },

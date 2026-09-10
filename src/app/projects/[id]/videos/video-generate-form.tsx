@@ -3,6 +3,7 @@
 import { Fragment, useMemo, useState, useTransition, type ChangeEvent, type FormEvent } from "react";
 import { generateVideoFromImage } from "@/lib/actions/media";
 import { uploadImage } from "@/lib/actions/uploads";
+import { isActionError } from "@/lib/actions/action-result";
 import { computeCreditCost } from "@/lib/billing/credit-costs";
 import { isHighlightedScriptLine } from "@/lib/script-highlight";
 import { DurationControl } from "../_components/duration-control";
@@ -234,16 +235,16 @@ export function VideoGenerateForm({
     if (!file) return;
     setError(null);
     startUploadTransition(async () => {
-      try {
-        const formData = new FormData();
-        // Can't nest a <form> here — this input lives inside the page's
-        // single outer <form>, so FormData is built manually instead.
-        formData.append("file", file);
-        const result = await uploadImage(projectId, formData);
-        pickSource(result.url, result.uploadId);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to upload image");
+      const formData = new FormData();
+      // Can't nest a <form> here — this input lives inside the page's
+      // single outer <form>, so FormData is built manually instead.
+      formData.append("file", file);
+      const result = await uploadImage(projectId, formData);
+      if (isActionError(result)) {
+        setError(result.error);
+        return;
       }
+      pickSource(result.url, result.uploadId);
     });
   }
 
@@ -294,27 +295,27 @@ export function VideoGenerateForm({
     const sceneContext = sourceMode === "scene" && selectedScene ? buildSceneContext(selectedScene, assetOptions) : undefined;
 
     startTransition(async () => {
-      try {
-        await generateVideoFromImage(projectId, {
-          sourceUrl: sourceUrl || undefined,
-          sourceUploadId: sourceMode === "media" ? sourceUploadId : undefined,
-          sourceIsStoryboard: sourceMode === "scene" && Boolean(sourceUrl),
-          prompt: prompt.trim() || null,
-          sceneContext,
-          durationSeconds: duration,
-          ratio: ratio || undefined,
-          resolution,
-          quantity,
-          referenceAssetIds: referenceAssetIds.length > 0 ? referenceAssetIds : undefined,
-          modelId,
-        });
-        setPrompt("");
-        if (sourceMode === "scene") {
-          setSelectedSceneId(null);
-          clearSource();
-        }
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to start generation");
+      const result = await generateVideoFromImage(projectId, {
+        sourceUrl: sourceUrl || undefined,
+        sourceUploadId: sourceMode === "media" ? sourceUploadId : undefined,
+        sourceIsStoryboard: sourceMode === "scene" && Boolean(sourceUrl),
+        prompt: prompt.trim() || null,
+        sceneContext,
+        durationSeconds: duration,
+        ratio: ratio || undefined,
+        resolution,
+        quantity,
+        referenceAssetIds: referenceAssetIds.length > 0 ? referenceAssetIds : undefined,
+        modelId,
+      });
+      if (isActionError(result)) {
+        setError(result.error);
+        return;
+      }
+      setPrompt("");
+      if (sourceMode === "scene") {
+        setSelectedSceneId(null);
+        clearSource();
       }
     });
   }

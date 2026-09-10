@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition, type ChangeEvent, type FormEvent } from "react";
 import { generateFreeformImages, generateVideoFromImage } from "@/lib/actions/media";
 import { uploadImage } from "@/lib/actions/uploads";
+import { isActionError } from "@/lib/actions/action-result";
 import { createClient } from "@/lib/supabase/client";
 import { computeCreditCost } from "@/lib/billing/credit-costs";
 import { QuantityControl } from "../_components/quantity-control";
@@ -109,31 +110,31 @@ export function ImageGenerateForm({
     const referenceMediaOptions = matched.filter((option) => option.type !== "character" && option.storagePath);
     setError(null);
     startTransition(async () => {
-      try {
-        let extraReferenceImageUrls: string[] | undefined;
-        if (referenceMediaOptions.length > 0) {
-          const supabase = createClient();
-          const signedResults = await Promise.all(
-            referenceMediaOptions.map((option) =>
-              supabase.storage.from("media").createSignedUrl(option.storagePath as string, 60 * 60),
-            ),
-          );
-          extraReferenceImageUrls = signedResults
-            .map((result) => result.data?.signedUrl)
-            .filter((url): url is string => Boolean(url));
-        }
-        await generateFreeformImages(projectId, {
-          prompt,
-          quantity,
-          ratio: ratio || undefined,
-          referenceAssetIds: referenceAssetIds.length > 0 ? referenceAssetIds : undefined,
-          extraReferenceImageUrls,
-          modelId,
-        });
-        setPrompt("");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to start generation");
+      let extraReferenceImageUrls: string[] | undefined;
+      if (referenceMediaOptions.length > 0) {
+        const supabase = createClient();
+        const signedResults = await Promise.all(
+          referenceMediaOptions.map((option) =>
+            supabase.storage.from("media").createSignedUrl(option.storagePath as string, 60 * 60),
+          ),
+        );
+        extraReferenceImageUrls = signedResults
+          .map((result) => result.data?.signedUrl)
+          .filter((url): url is string => Boolean(url));
       }
+      const result = await generateFreeformImages(projectId, {
+        prompt,
+        quantity,
+        ratio: ratio || undefined,
+        referenceAssetIds: referenceAssetIds.length > 0 ? referenceAssetIds : undefined,
+        extraReferenceImageUrls,
+        modelId,
+      });
+      if (isActionError(result)) {
+        setError(result.error);
+        return;
+      }
+      setPrompt("");
     });
   }
 
@@ -150,16 +151,16 @@ export function ImageGenerateForm({
       // Each file uploads independently (uploadImage validates/stores one
       // file per call) so one bad file (wrong type, too large) doesn't block
       // the rest of the batch.
-      const results = await Promise.allSettled(
+      const results = await Promise.all(
         fileList.map((file) => {
           const formData = new FormData();
           formData.append("file", file);
           return uploadImage(projectId, formData);
         }),
       );
-      const failed = results.filter((result): result is PromiseRejectedResult => result.status === "rejected");
+      const failed = results.filter(isActionError);
       if (failed.length === results.length) {
-        setError(failed[0].reason instanceof Error ? failed[0].reason.message : "Failed to upload images");
+        setError(failed[0].error);
         return;
       }
       if (failed.length > 0) {
@@ -198,32 +199,33 @@ export function ImageGenerateForm({
     const matchedType = matched.type;
     const matchedId = matched.id;
     startVideoTransition(async () => {
-      try {
-        // Re-sign fresh right before submitting rather than trusting a URL
-        // signed back when the dropdown option list was built (could be
-        // stale by the time of a real submit) — same client-side re-sign
-        // pattern as generation-media.tsx.
-        const supabase = createClient();
-        const { data: signed, error: signError } = await supabase.storage
-          .from("media")
-          .createSignedUrl(matchedStoragePath, 60 * 60);
-        if (signError || !signed) {
-          throw new Error("Failed to prepare the referenced image — try again.");
-        }
-        await generateVideoFromImage(projectId, {
-          sourceUrl: signed.signedUrl,
-          sourceUploadId: matchedType === "upload" ? matchedId : undefined,
-          prompt: videoPrompt,
-          durationSeconds: videoDuration,
-          resolution: videoResolution,
-          ratio: videoRatio || undefined,
-          quantity: videoQuantity,
-          modelId: videoModelId,
-        });
-        setVideoPrompt("");
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to start generation");
+      // Re-sign fresh right before submitting rather than trusting a URL
+      // signed back when the dropdown option list was built (could be
+      // stale by the time of a real submit) — same client-side re-sign
+      // pattern as generation-media.tsx.
+      const supabase = createClient();
+      const { data: signed, error: signError } = await supabase.storage
+        .from("media")
+        .createSignedUrl(matchedStoragePath, 60 * 60);
+      if (signError || !signed) {
+        setError("Failed to prepare the referenced image — try again.");
+        return;
       }
+      const result = await generateVideoFromImage(projectId, {
+        sourceUrl: signed.signedUrl,
+        sourceUploadId: matchedType === "upload" ? matchedId : undefined,
+        prompt: videoPrompt,
+        durationSeconds: videoDuration,
+        resolution: videoResolution,
+        ratio: videoRatio || undefined,
+        quantity: videoQuantity,
+        modelId: videoModelId,
+      });
+      if (isActionError(result)) {
+        setError(result.error);
+        return;
+      }
+      setVideoPrompt("");
     });
   }
 

@@ -2,6 +2,7 @@
 
 import { useState, useTransition, type FormEvent } from "react";
 import { generateCharacterSheet } from "@/lib/actions/media";
+import { isActionError } from "@/lib/actions/action-result";
 import { IMAGE_CREDIT_COST } from "@/lib/billing/credit-costs";
 import { DeleteAssetButton } from "../_components/delete-asset-button";
 import { ExpandableTextarea } from "../_components/expandable-textarea";
@@ -113,13 +114,12 @@ function RegenerateForm({
     if (!prompt.trim()) return;
     setError(null);
     startTransition(async () => {
-      try {
-        // Character sheets default to 16:9, matching Scenes > Assets — a
-        // fixed storyboard-panel aspect, not user-configurable here (no
-        // ratio control in this form).
-        await generateCharacterSheet(projectId, assetId, { prompt, quantity: 1, ratio: "16:9" });
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to start generation");
+      // Character sheets default to 16:9, matching Scenes > Assets — a
+      // fixed storyboard-panel aspect, not user-configurable here (no
+      // ratio control in this form).
+      const result = await generateCharacterSheet(projectId, assetId, { prompt, quantity: 1, ratio: "16:9" });
+      if (isActionError(result)) {
+        setError(result.error);
       }
     });
   }

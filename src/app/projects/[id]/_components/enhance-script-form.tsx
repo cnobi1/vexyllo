@@ -1,20 +1,24 @@
 "use client";
 
 import { useRef, useState, type FormEvent } from "react";
+import { enhanceScriptFromUpload } from "@/lib/actions/projects";
+import { useActionForm } from "@/app/_components/use-action-form";
 import { SubmitButton } from "./submit-button";
 
 /**
  * Neither the file input nor the pasted-script textarea can be `required`
  * on its own (either one alone satisfies the form), so an empty submission
- * of both was reaching enhanceScriptFromUpload, which throws — an uncaught
- * throw from a plain <form action> Server Action crashes to Next's generic
- * fatal error page instead of showing a normal inline message. Guard it
- * client-side before the request ever goes out.
+ * of both was reaching enhanceScriptFromUpload — guarded client-side before
+ * the request ever goes out, same as any other client-side form validation.
+ * A genuine server-side failure (bad file, LLM error, etc.) now surfaces via
+ * useActionForm's returned {error} instead of a thrown, production-redacted
+ * exception — see action-result.ts.
  */
-export function EnhanceScriptForm({ action }: { action: (formData: FormData) => Promise<void> }) {
+export function EnhanceScriptForm({ projectId }: { projectId: string }) {
   const fileRef = useRef<HTMLInputElement>(null);
   const pastedRef = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState<string | null>(null);
+  const [state, formAction] = useActionForm(enhanceScriptFromUpload.bind(null, projectId));
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     const hasFile = (fileRef.current?.files?.length ?? 0) > 0;
@@ -29,7 +33,7 @@ export function EnhanceScriptForm({ action }: { action: (formData: FormData) => 
 
   return (
     <form
-      action={action}
+      action={formAction}
       onSubmit={handleSubmit}
       className="card-glow flex flex-col gap-3 rounded-2xl p-6"
     >
@@ -79,7 +83,7 @@ export function EnhanceScriptForm({ action }: { action: (formData: FormData) => 
           className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
         />
       </div>
-      {error && <p className="text-sm text-danger">{error}</p>}
+      {(error ?? state?.error) && <p className="text-sm text-danger">{error ?? state?.error}</p>}
       <SubmitButton label="✦ Enhance Script" pendingLabel="Enhancing…" />
     </form>
   );
