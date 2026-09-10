@@ -91,19 +91,20 @@ export default async function ScenesPage({
           <p className="text-sm text-muted">
             {hasScenes
               ? "Regenerating replaces the current scene breakdown with a fresh one from the script. Existing characters, locations, and props are matched by name and keep their reference images — only ones no longer in the script are removed."
-              : "Break this project's script down into a scene-by-scene breakdown sheet: each scene's full text, estimated screen time, and the characters (with wardrobe notes), locations, and props it contains."}
+              : "Break this project's script down into a scene-by-scene breakdown sheet: each scene's full text, estimated screen time, and the characters (with wardrobe notes), locations, and props it contains. Every scene is kept between 10 and 30 seconds of screen time — a longer beat is automatically split across sequential scenes, and a shorter one is combined with its neighbor."}
           </p>
           <label className="flex items-center gap-2 text-sm text-muted">
-            Max scene duration
+            Target scene duration
             <input
               type="number"
               name="targetSceneDurationSeconds"
-              min={1}
+              min={10}
+              max={30}
               defaultValue={project.target_scene_duration_seconds ?? ""}
-              placeholder="No max"
+              placeholder="10-30"
               className="w-20 rounded-lg border border-border bg-background/60 px-2 py-1 text-sm text-foreground outline-none focus:border-border-strong"
             />
-            seconds (optional)
+            seconds (optional, 10-30)
           </label>
           <GenerateButton hasScenes={hasScenes} />
         </form>

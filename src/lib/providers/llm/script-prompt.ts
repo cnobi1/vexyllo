@@ -1,4 +1,5 @@
 import type { BreakdownScriptInput, EnhanceScriptInput, GenerateScriptInput } from "./types";
+import { MAX_SCENE_DURATION_SECONDS, MIN_SCENE_DURATION_SECONDS } from "@/lib/scripts/enforce-scene-duration-range";
 
 // Shared by all three script-facing prompts (generate-from-idea, enhance,
 // and the storyboard breakdown) — this is what pushes description past
@@ -60,8 +61,9 @@ export function buildBreakdownPrompt({
     "- summary: a one or two sentence summary of what happens.",
     "- dialogue: the key dialogue lines, or null if the scene is non-verbal.",
     "- durationSeconds: a realistic estimate of the scene's screen time in seconds, based on its length and pacing (dialogue-heavy scenes run slower than action).",
+    `Every scene's estimated screen time must fall between ${MIN_SCENE_DURATION_SECONDS} and ${MAX_SCENE_DURATION_SECONDS} seconds. If a beat would naturally run longer than ${MAX_SCENE_DURATION_SECONDS} seconds, split it into multiple sequential scenes (repeating the same scene heading is fine) rather than inflating one scene's duration. If a beat would naturally run under ${MIN_SCENE_DURATION_SECONDS} seconds, combine it with the adjacent beat into one scene instead of leaving an isolated, too-short scene on its own.`,
     targetSceneDurationSeconds
-      ? `The production has set a target of at most ${targetSceneDurationSeconds} seconds per scene. Design toward this — favor splitting a long beat into more scenes over inflating a single scene's duration — but treat it as a target, not a hard limit you must hit exactly; some scenes will legitimately need more or less.`
+      ? `The production has additionally set a tighter target of at most ${targetSceneDurationSeconds} seconds per scene, within the ${MIN_SCENE_DURATION_SECONDS}-${MAX_SCENE_DURATION_SECONDS} second range above. Design toward this target where reasonable, but it's a preference on top of that hard range, not a replacement for it.`
       : null,
     "Also extract the recurring characters, locations, and props referenced across the script as assets.",
     "Each asset's description is handed to an image model on its own, with no other asset's description alongside it for contrast — so it must fully specify what makes this asset look like itself and nobody/nothing else, not lean on the reader inferring a contrast from the rest of the cast. For characters in particular: two characters who share an age bracket, gender, and role (e.g. two 50s Nigerian businesswomen, two doctors) will render as visually near-identical unless each description calls out specific, individuating physical details — face shape, distinguishing marks (scar, mole, gap tooth), build, a specific hairstyle or feature — not just demographic/role/personality descriptors like \"50s, stern, businesswoman\" that could equally describe several other characters in the same script.",

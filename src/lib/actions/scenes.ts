@@ -7,6 +7,11 @@ import { createClient } from "@/lib/supabase/server";
 import { getLLMProvider } from "@/lib/providers/llm";
 import type { BreakdownAsset, BreakdownScene } from "@/lib/providers/llm/types";
 import { chunkScriptForBreakdown } from "@/lib/scripts/chunk-script-for-breakdown";
+import {
+  MAX_SCENE_DURATION_SECONDS,
+  MIN_SCENE_DURATION_SECONDS,
+  enforceSceneDurationRange,
+} from "@/lib/scripts/enforce-scene-duration-range";
 import { BREAKDOWN_CREDIT_COST } from "@/lib/billing/credit-costs";
 import { requireCredits, recordSpend } from "@/lib/billing/spend-credits";
 
@@ -19,7 +24,9 @@ export async function generateSceneBreakdown(projectId: string, formData: FormDa
 
   const rawDuration = formData.get("targetSceneDurationSeconds");
   const targetSceneDurationSeconds =
-    rawDuration && String(rawDuration).trim() ? Math.max(1, Math.round(Number(rawDuration))) : null;
+    rawDuration && String(rawDuration).trim()
+      ? Math.min(MAX_SCENE_DURATION_SECONDS, Math.max(MIN_SCENE_DURATION_SECONDS, Math.round(Number(rawDuration))))
+      : null;
 
   const { data: project, error: projectError } = await supabase
     .from("projects")
@@ -85,11 +92,22 @@ export async function generateSceneBreakdown(projectId: string, formData: FormDa
       if (!mergedAssetsByKey.has(key)) mergedAssetsByKey.set(key, asset);
     }
     for (const scene of batchResult.scenes) {
-      mergedScenes.push({ ...scene, order: mergedScenes.length + 1 });
+      mergedScenes.push(scene);
     }
   }
 
-  const result = { assets: Array.from(mergedAssetsByKey.values()), scenes: mergedScenes };
+  // Every scene must land between MIN_SCENE_DURATION_SECONDS and
+  // MAX_SCENE_DURATION_SECONDS regardless of what the LLM estimated: an
+  // oversized scene's overflow spills into new sequential scenes, and an
+  // undersized scene is folded into its neighbor. Order is (re)assigned
+  // here, after splitting/merging, since the pre-enforcement order is no
+  // longer meaningful once scenes have been expanded/collapsed.
+  const orderedScenes = enforceSceneDurationRange(mergedScenes).map((scene, index) => ({
+    ...scene,
+    order: index + 1,
+  }));
+
+  const result = { assets: Array.from(mergedAssetsByKey.values()), scenes: orderedScenes };
 
   const { error: deleteScenesError } = await supabase
     .from("scenes")
