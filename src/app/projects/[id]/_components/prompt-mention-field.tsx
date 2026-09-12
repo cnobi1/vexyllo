@@ -74,6 +74,7 @@ export function PromptMentionField({
   options,
   placeholder,
   mentionStyle = "inline",
+  maxLength,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -81,6 +82,7 @@ export function PromptMentionField({
   placeholder?: string;
   /** "inline" inserts "@Name " (Scenes tab prompt). "screenplay" inserts "@NAME" (caps) on its own line, ready for a dialogue line underneath — script-style speaker tags for the Videos tab's dialogue prompt. */
   mentionStyle?: "inline" | "screenplay";
+  maxLength?: number;
 }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [mention, setMention] = useState<MentionState>(CLOSED);
@@ -171,6 +173,7 @@ export function PromptMentionField({
         onKeyDown={handleKeyDown}
         onBlur={() => setTimeout(() => setMention(CLOSED), 120)}
         placeholder={placeholder}
+        maxLength={maxLength}
       />
       {mention.open && matches.length > 0 && (
         <div className="card-glow absolute left-0 top-full z-20 mt-1 max-h-56 w-full overflow-y-auto rounded-lg border border-border p-1">

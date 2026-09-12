@@ -32,6 +32,7 @@ export function GenerationFeed({
   columns,
   showPrompt,
   onEditPrompt,
+  onPendingChange,
 }: {
   projectId: string;
   kinds: string[];
@@ -44,6 +45,8 @@ export function GenerationFeed({
   /** Set false when the prompt is already shown/editable elsewhere (e.g. the Assets tab's own description field). Defaults true. */
   showPrompt?: boolean;
   onEditPrompt?: (prompt: string) => void;
+  /** Fires whenever this feed's own "is anything still pending" answer changes — lets a caller show a generating indicator somewhere outside the feed itself (e.g. the asset card's main image, in assets-list.tsx). */
+  onPendingChange?: (hasPending: boolean) => void;
 }) {
   const [items, setItems] = useState(initialItems);
   const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
@@ -51,6 +54,11 @@ export function GenerationFeed({
   const itemsRef = useRef(items);
   useEffect(() => {
     itemsRef.current = items;
+  }, [items]);
+
+  useEffect(() => {
+    onPendingChange?.(items.some((item) => item.status === "pending"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- onPendingChange is a setState passed down by the caller, not a value this effect should re-run for on its own
   }, [items]);
 
   useEffect(() => {

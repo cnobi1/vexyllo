@@ -1,0 +1,13 @@
+-- Snapshot of which scene (1-based position, matching how the Scenes tab
+-- itself numbers cards -- "Scene 1", "Scene 2", ...) a video was generated
+-- from via the Videos tab's "From scene" mode. Deliberately NOT a live FK
+-- to scenes.id: generations.scene_id already exists but is reserved for
+-- kind='scene_storyboard' rows only (see the kind/scene_id/shot_id check
+-- constraint), and it's on delete set null specifically so a generation
+-- survives a breakdown regeneration -- reusing that column (or adding
+-- another FK with the same semantics) would make a video's displayed scene
+-- number silently vanish the next time someone regenerates the scene
+-- breakdown. A plain snapshotted integer, captured once at generation time,
+-- keeps showing "Scene 3" for that video forever, independent of whether
+-- scene 3 still exists.
+alter table public.generations add column scene_number integer;

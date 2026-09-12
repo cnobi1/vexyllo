@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { PRESET_STYLES, CUSTOM_STYLE_VALUE } from "@/lib/project-styles";
+import { useTextLimits } from "@/app/_components/use-text-limits";
 
 const fieldClasses =
   "rounded-lg border border-border bg-background/60 px-3 py-2.5 text-sm text-foreground outline-none focus:border-border-strong";
@@ -14,6 +15,7 @@ const fieldClasses =
  */
 export function NewProjectStyleField() {
   const [selected, setSelected] = useState("");
+  const limits = useTextLimits();
 
   return (
     <div className="flex flex-col gap-1.5">
@@ -39,6 +41,7 @@ export function NewProjectStyleField() {
         <input
           name="customStyle"
           autoFocus
+          maxLength={limits.short_text}
           placeholder="e.g. noir, anime, watercolor…"
           className={`${fieldClasses} placeholder:text-muted-2`}
         />

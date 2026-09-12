@@ -1,32 +1,141 @@
-import { signInWithGoogle } from "@/lib/actions/auth";
+"use client";
 
-export function GoogleAuthButton({ label }: { label: string }) {
+import { useEffect, useRef, useState } from "react";
+import { createClient } from "@/lib/supabase/client";
+
+const GOOGLE_CLIENT_ID = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID;
+const GSI_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
+const GSI_SCRIPT_ID = "google-identity-services";
+const BUTTON_WIDTH = 320;
+
+declare global {
+  interface Window {
+    google?: {
+      accounts: {
+        id: {
+          initialize: (config: {
+            client_id: string;
+            callback: (response: { credential: string }) => void;
+            nonce?: string;
+            use_fedcm_for_prompt?: boolean;
+          }) => void;
+          renderButton: (
+            parent: HTMLElement,
+            options: { theme?: string; size?: string; text?: string; width?: number },
+          ) => void;
+        };
+      };
+    };
+  }
+}
+
+/**
+ * Random nonce (raw + SHA-256 hex digest), per Supabase's signInWithIdToken
+ * docs: the hashed form goes to Google (initialize's `nonce`), the raw form
+ * goes back to Supabase (signInWithIdToken's `nonce`) so it can verify the
+ * ID token wasn't replayed.
+ */
+async function generateNonce(): Promise<[raw: string, hashed: string]> {
+  const raw = btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(32))));
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(raw));
+  const hashed = Array.from(new Uint8Array(digest))
+    .map((byte) => byte.toString(16).padStart(2, "0"))
+    .join("");
+  return [raw, hashed];
+}
+
+function loadGsiScript(): Promise<void> {
+  if (window.google?.accounts?.id) return Promise.resolve();
+  const existing = document.getElementById(GSI_SCRIPT_ID) as HTMLScriptElement | null;
+  if (existing) {
+    return new Promise((resolve) => existing.addEventListener("load", () => resolve(), { once: true }));
+  }
+  return new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.id = GSI_SCRIPT_ID;
+    script.src = GSI_SCRIPT_SRC;
+    script.async = true;
+    script.defer = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Failed to load Google Identity Services"));
+    document.head.appendChild(script);
+  });
+}
+
+/**
+ * Signs the user in via Google Identity Services' own button + credential
+ * flow (an id_token handed to supabase.auth.signInWithIdToken), instead of
+ * Supabase's hosted OAuth redirect (supabase.auth.signInWithOAuth, the
+ * previous implementation here). The redirect flow's Google consent screen
+ * always reads "to continue to <project-ref>.supabase.co" -- that's
+ * GoTrue's own callback URL, which Google displays verbatim, and the only
+ * way to change *that* is Supabase's paid Custom Domain add-on (see the
+ * project_pending_custom_auth_domain memory, declined as a paid option).
+ * This flow instead has the browser talk to Google directly from our own
+ * origin, so Google shows our own domain on the consent screen instead --
+ * no Supabase add-on, no extra redirect hop. Requires the site's origin(s)
+ * (production + localhost) to be added under "Authorized JavaScript
+ * origins" on this Client ID in Google Cloud Console -- a one-time manual
+ * step only the project owner can do there. See
+ * https://supabase.com/docs/guides/auth/social-login/auth-google#google-pre-built-button.
+ */
+export function GoogleAuthButton({ mode }: { mode: "continue" | "signup" }) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Render-time check below already hides the component entirely when
+    // this is unset, so there's nothing to synchronize here in that case.
+    if (!GOOGLE_CLIENT_ID) return;
+    let cancelled = false;
+
+    (async () => {
+      const [rawNonce, hashedNonce] = await generateNonce();
+      await loadGsiScript();
+      if (cancelled || !containerRef.current || !window.google) return;
+
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        nonce: hashedNonce,
+        use_fedcm_for_prompt: true,
+        callback: async (response) => {
+          const supabase = createClient();
+          const { error: signInError } = await supabase.auth.signInWithIdToken({
+            provider: "google",
+            token: response.credential,
+            nonce: rawNonce,
+          });
+          if (signInError) {
+            setError(signInError.message);
+            return;
+          }
+          // Full navigation, not router.push/refresh: this codebase has an
+          // observed router.refresh()-after-client-side-auth hang in this
+          // exact Next.js/Turbopack setup (see image-generate-form.tsx's
+          // upload mode and delete-upload-button.tsx), so a hard reload is
+          // the reliable choice on a login-critical path.
+          window.location.assign("/dashboard");
+        },
+      });
+      window.google.accounts.id.renderButton(containerRef.current, {
+        theme: "outline",
+        size: "large",
+        width: BUTTON_WIDTH,
+        text: mode === "signup" ? "signup_with" : "continue_with",
+      });
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [mode]);
+
+  if (!GOOGLE_CLIENT_ID) return null;
+
   return (
-    <form action={signInWithGoogle}>
-      <button
-        type="submit"
-        className="flex w-full items-center justify-center gap-2 rounded-full border border-border bg-background/60 px-4 py-2 text-sm font-medium text-foreground transition-colors hover:border-border-strong"
-      >
-        <svg viewBox="0 0 48 48" className="h-4 w-4" aria-hidden="true">
-          <path
-            fill="#FFC107"
-            d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"
-          />
-          <path
-            fill="#FF3D00"
-            d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"
-          />
-          <path
-            fill="#4CAF50"
-            d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"
-          />
-          <path
-            fill="#1976D2"
-            d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"
-          />
-        </svg>
-        {label}
-      </button>
-    </form>
+    <div className="flex flex-col items-center gap-2">
+      <div ref={containerRef} />
+      {error && <p className="text-sm text-danger">{error}</p>}
+    </div>
   );
 }

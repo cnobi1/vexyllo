@@ -46,6 +46,25 @@ const NAV_ITEMS = [
     ),
   },
   {
+    label: "Subscriptions",
+    href: "/admin/subscriptions",
+    icon: (props: SVGProps<SVGSVGElement>) => (
+      <Icon {...props}>
+        <rect x="3" y="5" width="18" height="14" rx="2" />
+        <path d="M3 10h18M7 15h4" />
+      </Icon>
+    ),
+  },
+  {
+    label: "Text limits",
+    href: "/admin/text-limits",
+    icon: (props: SVGProps<SVGSVGElement>) => (
+      <Icon {...props}>
+        <path d="M4 6h16M4 12h10M4 18h13" />
+      </Icon>
+    ),
+  },
+  {
     label: "Users",
     href: "/admin/users",
     superAdminOnly: true,

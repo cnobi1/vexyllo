@@ -4,6 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { updateProjectStyle } from "@/lib/actions/projects";
 import { isActionError } from "@/lib/actions/action-result";
 import { PRESET_STYLES } from "@/lib/project-styles";
+import { useTextLimits } from "@/app/_components/use-text-limits";
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
@@ -34,6 +35,7 @@ export function StyleSelector({ projectId, currentStyle }: { projectId: string; 
   );
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const limits = useTextLimits();
 
   function applyStyle(style: string) {
     setOpen(false);
@@ -87,6 +89,7 @@ export function StyleSelector({ projectId, currentStyle }: { projectId: string; 
                   autoFocus
                   value={customValue}
                   onChange={(event) => setCustomValue(event.target.value)}
+                  maxLength={limits.short_text}
                   placeholder="e.g. noir, anime, watercolor…"
                   className="rounded-md border border-border bg-background/60 px-2 py-1 text-xs text-foreground outline-none focus:border-border-strong"
                 />

@@ -1,5 +1,5 @@
 import { createServiceClient } from "@/lib/supabase/service";
-import { getPlan } from "@/lib/billing/plans";
+import { loadPlan } from "@/lib/billing/plans";
 import { getTopUpPack } from "@/lib/billing/topup-packs";
 import type { BillingProvider, StartCheckoutInput, StartCheckoutResult, StartTopUpCheckoutInput } from "./types";
 
@@ -19,8 +19,8 @@ const THIRTY_DAYS_MS = 30 * 24 * 60 * 60 * 1000;
 export const mockBillingAdapter: BillingProvider = {
   name: "mock",
   async startCheckout(input: StartCheckoutInput): Promise<StartCheckoutResult> {
-    const plan = getPlan(input.plan);
     const supabase = createServiceClient();
+    const plan = await loadPlan(supabase, input.plan);
 
     const { error: subError } = await supabase.from("subscriptions").upsert(
       {

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition, type FormEvent } from "reac
 import { generateCharacterSheet } from "@/lib/actions/media";
 import { isActionError } from "@/lib/actions/action-result";
 import { IMAGE_CREDIT_COST } from "@/lib/billing/credit-costs";
+import { useTextLimits } from "@/app/_components/use-text-limits";
 import { QuantityControl } from "./quantity-control";
 
 export function AssetGenerateForm({
@@ -22,6 +23,7 @@ export function AssetGenerateForm({
   const [isPending, startTransition] = useTransition();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [appliedNonce, setAppliedNonce] = useState(prefill?.nonce);
+  const limits = useTextLimits();
 
   // Adjusting state in response to a prop change is done during render (React's
   // recommended pattern), not in an effect — the effect below only drives the
@@ -63,6 +65,7 @@ export function AssetGenerateForm({
         placeholder="Describe its appearance — this generates a batch of consistent reference images…"
         rows={3}
         required
+        maxLength={limits.prompt}
         className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
       />
       <div className="flex flex-wrap items-center justify-between gap-4">

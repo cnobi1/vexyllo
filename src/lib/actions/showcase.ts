@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { assertMaxLength, loadTextLimits } from "@/lib/text-limits";
 import { requireAdmin } from "./admin-guard";
 import { runAction } from "./action-result";
 
@@ -34,6 +35,10 @@ async function saveShowcaseItemsImpl(items: PendingShowcaseItem[]) {
 
   if (items.length === 0) {
     throw new Error("No uploaded items to save.");
+  }
+  const limits = await loadTextLimits(supabase);
+  for (const item of items) {
+    assertMaxLength(item.prompt ?? "", limits.description, "Prompt");
   }
 
   const { error } = await supabase.from("showcase_items").insert(

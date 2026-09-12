@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { extFromContentType } from "@/lib/media/copy-to-storage";
 import { MAX_UPLOAD_BYTES } from "@/lib/media/upload-limits";
+import { assertMaxLength, loadTextLimits } from "@/lib/text-limits";
 import { loadOwnedProject } from "./project-guard";
 import { runAction } from "./action-result";
 
@@ -18,6 +19,9 @@ async function createAssetImpl(projectId: string, formData: FormData) {
   if (!name) return;
 
   const supabase = await createClient();
+  const limits = await loadTextLimits(supabase);
+  assertMaxLength(name, limits.name, "Name");
+  assertMaxLength(description, limits.prompt, "Description");
   await loadOwnedProject(supabase, projectId);
 
   const { error } = await supabase
@@ -43,6 +47,9 @@ async function updateAssetImpl(projectId: string, assetId: string, formData: For
   if (!name) return;
 
   const supabase = await createClient();
+  const limits = await loadTextLimits(supabase);
+  assertMaxLength(name, limits.name, "Name");
+  assertMaxLength(description, limits.prompt, "Description");
   await loadOwnedProject(supabase, projectId);
 
   const { error } = await supabase
@@ -99,6 +106,8 @@ export async function updateAssetImageLabel(
   const label = String(formData.get("label") ?? "").trim();
 
   const supabase = await createClient();
+  const limits = await loadTextLimits(supabase);
+  assertMaxLength(label, limits.note, "Label");
   await loadOwnedProject(supabase, projectId);
 
   const { data: image, error: imageError } = await supabase

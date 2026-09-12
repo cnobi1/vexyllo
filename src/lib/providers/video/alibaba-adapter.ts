@@ -88,10 +88,39 @@ export const alibabaVideoAdapter: VideoProvider = {
     if (task_status === "FAILED") {
       return { status: "failed", errorMessage: message ?? "Wan video generation failed" };
     }
-    // PENDING/RUNNING/UNKNOWN/CANCELED (CANCELED never expected in practice —
-    // nothing in this codebase cancels a task) are all treated as still
-    // in-progress so Workflow's poll loop keeps retrying rather than
-    // terminating the generation on one ambiguous read.
+    if (task_status === "CANCELED") {
+      // Nothing in this codebase ever cancels a task, so this only ever
+      // shows up when Alibaba cancels it on their end (workspace/quota
+      // change, model access revoked mid-run, etc.) — treating it as
+      // "still running" left it retrying for up to 45 minutes before
+      // dying with an opaque "Step exceeded maximum queue deliveries"
+      // instead of surfacing the real, immediate terminal state.
+      return {
+        status: "failed",
+        errorMessage:
+          (message ? `${message} — ` : "") +
+          `Alibaba canceled this video task on their end (task_status: CANCELED, task_id: ${handle.providerTaskId}). This wasn't triggered by this app — check the Alibaba Cloud Model Studio / DashScope console for workspace quota or model-access changes.`,
+      };
+    }
+    if (task_status === "UNKNOWN") {
+      // Seen in practice paired with the exact "Access to model denied"
+      // workspace-permission error that got Wan 3.0 deactivated once
+      // already (20260908020000_deactivate_wan_pending_alibaba_access.sql)
+      // — the task never actually started on Alibaba's side, so it will
+      // never transition to a real terminal status no matter how long we
+      // poll. Failing fast here instead of retrying for 45 minutes turns
+      // that into an immediate, actionable error instead of a generic
+      // queue-delivery timeout.
+      return {
+        status: "failed",
+        errorMessage:
+          (message ? `${message} — ` : "") +
+          `Alibaba returned an unrecognized task status (UNKNOWN, task_id: ${handle.providerTaskId}) — this task never actually started running, most likely a workspace/model access issue on Alibaba's side rather than a transient delay. Check the Alibaba Cloud Model Studio console for this workspace's Wan 3.0 access before retrying.`,
+      };
+    }
+    // PENDING/RUNNING are the only genuinely still-in-progress statuses —
+    // everything else above is now a fast, specific failure instead of an
+    // indefinite retry.
     return { status: "running" };
   },
 };

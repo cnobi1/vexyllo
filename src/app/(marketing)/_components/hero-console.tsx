@@ -3,6 +3,7 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { startProjectFromIdea } from "@/lib/actions/projects";
 import { isActionError } from "@/lib/actions/action-result";
+import { useTextLimits } from "@/app/_components/use-text-limits";
 import { SparkleIcon } from "@/app/_components/sparkle-icon";
 
 const TABS = [
@@ -16,6 +17,7 @@ export function HeroConsole() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const active = TABS.find((t) => t.id === tab)!;
+  const limits = useTextLimits();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -56,6 +58,7 @@ export function HeroConsole() {
           name="idea"
           required
           rows={2}
+          maxLength={limits.idea}
           placeholder={active.placeholder}
           className="w-full resize-none bg-transparent text-sm text-foreground placeholder:text-muted-2 outline-none"
         />

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { assertMaxLength, loadTextLimits, type TextLimits } from "@/lib/text-limits";
 import { requireAdmin } from "./admin-guard";
 import { runAction } from "./action-result";
 
@@ -47,6 +48,24 @@ function toRow(input: ModelCatalogInput) {
   };
 }
 
+function validateInput(input: ModelCatalogInput, limits: TextLimits) {
+  if (input.creditCostMode === "flat" && input.flatCreditCost == null) {
+    throw new Error("Flat-cost models need a credit cost.");
+  }
+  if (input.creditCostMode === "duration_multiplier" && input.creditsPerSecond == null) {
+    throw new Error("Duration-priced models need a credits-per-second rate.");
+  }
+  assertMaxLength(input.providerModelId, limits.technical_id, "Provider model id");
+  assertMaxLength(input.displayName, limits.name, "Display name");
+  assertMaxLength(input.description ?? "", limits.description, "Description");
+  for (const resolution of input.allowedResolutions ?? []) {
+    assertMaxLength(resolution, limits.technical_id, "Allowed resolutions");
+  }
+  for (const ratio of input.allowedRatios ?? []) {
+    assertMaxLength(ratio, limits.technical_id, "Allowed ratios");
+  }
+}
+
 // Both admin roles manage the catalog per the two-tier role split — only
 // managing other admins is Super Admin-only (see admin-admins.ts).
 export async function createModel(input: ModelCatalogInput) {
@@ -56,13 +75,7 @@ export async function createModel(input: ModelCatalogInput) {
 async function createModelImpl(input: ModelCatalogInput) {
   const supabase = await createClient();
   await requireAdmin(supabase);
-
-  if (input.creditCostMode === "flat" && input.flatCreditCost == null) {
-    throw new Error("Flat-cost models need a credit cost.");
-  }
-  if (input.creditCostMode === "duration_multiplier" && input.creditsPerSecond == null) {
-    throw new Error("Duration-priced models need a credits-per-second rate.");
-  }
+  validateInput(input, await loadTextLimits(supabase));
 
   const { error } = await supabase.from("generation_models").insert(toRow(input));
   if (error) throw new Error(error.message);
@@ -77,13 +90,7 @@ export async function updateModel(id: string, input: ModelCatalogInput) {
 async function updateModelImpl(id: string, input: ModelCatalogInput) {
   const supabase = await createClient();
   await requireAdmin(supabase);
-
-  if (input.creditCostMode === "flat" && input.flatCreditCost == null) {
-    throw new Error("Flat-cost models need a credit cost.");
-  }
-  if (input.creditCostMode === "duration_multiplier" && input.creditsPerSecond == null) {
-    throw new Error("Duration-priced models need a credits-per-second rate.");
-  }
+  validateInput(input, await loadTextLimits(supabase));
 
   const { error } = await supabase.from("generation_models").update(toRow(input)).eq("id", id);
   if (error) throw new Error(error.message);

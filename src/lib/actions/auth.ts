@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { Resend } from "resend";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { loadTextLimits } from "@/lib/text-limits";
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000";
 const resend = new Resend(process.env.RESEND_API_KEY);
@@ -70,9 +71,14 @@ export async function signup(
 ): Promise<AuthState> {
   const email = String(formData.get("email") ?? "");
   const password = String(formData.get("password") ?? "");
-  const idea = String(formData.get("idea") ?? "").trim();
 
   const supabase = await createClient();
+  // Truncated rather than rejected: idea is a bonus passthrough (prefills the
+  // project's "Write with AI" box after signup), not a required field — an
+  // oversized value shouldn't block account creation the way it would for a
+  // dedicated idea-submission action elsewhere.
+  const limits = await loadTextLimits(supabase);
+  const idea = String(formData.get("idea") ?? "").trim().slice(0, limits.idea);
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
@@ -186,22 +192,6 @@ export async function resetPassword(
   }
 
   redirect("/dashboard");
-}
-
-export async function signInWithGoogle() {
-  const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
-    options: {
-      redirectTo: `${SITE_URL}/auth/callback`,
-    },
-  });
-
-  if (error || !data.url) {
-    redirect(`/login?error=${encodeURIComponent(error?.message ?? "Could not start Google sign-in.")}`);
-  }
-
-  redirect(data.url);
 }
 
 export async function logout() {

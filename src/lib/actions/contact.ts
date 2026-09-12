@@ -1,6 +1,8 @@
 "use server";
 
 import { Resend } from "resend";
+import { createClient } from "@/lib/supabase/server";
+import { loadTextLimits } from "@/lib/text-limits";
 
 export type ContactState = { error?: string; message?: string } | undefined;
 
@@ -17,6 +19,15 @@ export async function submitContactForm(
 
   if (!name || !email || !message) {
     return { error: "Name, email, and message are required." };
+  }
+  const limits = await loadTextLimits(await createClient());
+  if (
+    name.length > limits.name ||
+    email.length > limits.email ||
+    phone.length > limits.short_text ||
+    message.length > limits.instructions
+  ) {
+    return { error: "One of the fields above is too long. Please shorten it and try again." };
   }
 
   const { error } = await resend.emails.send({

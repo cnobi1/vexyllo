@@ -1,3 +1,5 @@
+import type { createClient } from "@/lib/supabase/server";
+
 // Pricing — validated against a real BytePlus invoice
 // (bill_detail_3003786644_20260908_20260901_479063.csv, 2026-09-06/07):
 // Seedream image generation actually costs $0.09/image (IMAGE_CREDIT_COST=2
@@ -38,6 +40,45 @@ export const VIDEO_CREDITS_PER_SECOND = 14;
 export const CREDITS_PER_REFERENCE_IMAGE = 4;
 export const MIN_VIDEO_CREDIT_COST = 80;
 
+// Admin-tunable global credit costs — script/breakdown/min-video-floor
+// aren't tied to any one generation_models row (unlike per-model image/video
+// pricing, already admin-editable via /admin/models), so they live in their
+// own small table (credit_cost_settings) instead, editable at
+// /admin/subscriptions. Constants above stay as the fallback defaults used
+// if the DB read ever fails or a row goes missing — same defensive pattern
+// as text-limits.ts.
+export interface CreditCostSettings {
+  scriptCreditCost: number;
+  breakdownCreditCost: number;
+  minVideoCreditCost: number;
+}
+
+export const DEFAULT_CREDIT_COST_SETTINGS: CreditCostSettings = {
+  scriptCreditCost: 2,
+  breakdownCreditCost: 3,
+  minVideoCreditCost: MIN_VIDEO_CREDIT_COST,
+};
+
+const CREDIT_COST_SETTINGS_KEYS: Record<keyof CreditCostSettings, string> = {
+  scriptCreditCost: "script",
+  breakdownCreditCost: "breakdown",
+  minVideoCreditCost: "min_video_floor",
+};
+
+/** Server-side loader — call with the request's Supabase client from inside a server action. */
+export async function loadCreditCostSettings(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<CreditCostSettings> {
+  const { data } = await supabase.from("credit_cost_settings").select("key, credits");
+  const byKey = new Map((data ?? []).map((row) => [row.key, row.credits]));
+  const settings = { ...DEFAULT_CREDIT_COST_SETTINGS };
+  for (const field of Object.keys(CREDIT_COST_SETTINGS_KEYS) as (keyof CreditCostSettings)[]) {
+    const credits = byKey.get(CREDIT_COST_SETTINGS_KEYS[field]);
+    if (credits != null) settings[field] = credits;
+  }
+  return settings;
+}
+
 // Flat per-request costs for LLM (DeepSeek) calls — script generation and
 // scene breakdown were previously unmetered entirely. DeepSeek's own cost
 // per call is small enough that precise metering isn't worth the UX
@@ -63,9 +104,9 @@ const RESOLUTION_COST_MULTIPLIER: Record<string, number> = {
   "4k": 1.5,
 };
 
-export function videoCreditCost(durationSeconds: number, resolution?: string): number {
+export function videoCreditCost(durationSeconds: number, resolution?: string, minVideoCreditCost = MIN_VIDEO_CREDIT_COST): number {
   const multiplier = resolution ? (RESOLUTION_COST_MULTIPLIER[resolution] ?? 1) : 1;
-  return Math.max(MIN_VIDEO_CREDIT_COST, Math.ceil(durationSeconds * VIDEO_CREDITS_PER_SECOND * multiplier));
+  return Math.max(minVideoCreditCost, Math.ceil(durationSeconds * VIDEO_CREDITS_PER_SECOND * multiplier));
 }
 
 // Per-model pricing, sourced from a generation_models catalog row (see
@@ -84,7 +125,13 @@ export interface GenerationModelPricing {
 
 export function computeCreditCost(
   model: GenerationModelPricing,
-  opts: { durationSeconds?: number; resolution?: string; referenceImageCount?: number } = {},
+  opts: {
+    durationSeconds?: number;
+    resolution?: string;
+    referenceImageCount?: number;
+    /** Live value from credit_cost_settings ('min_video_floor') — defaults to the hardcoded constant when a caller doesn't have settings loaded (e.g. hasn't been updated to pass them yet). */
+    minVideoCreditCost?: number;
+  } = {},
 ): number {
   if (model.creditCostMode === "flat") {
     if (model.flatCreditCost == null) {
@@ -101,5 +148,5 @@ export function computeCreditCost(
   // comment for how this number was derived).
   const extraReferenceImages = Math.max(0, (opts.referenceImageCount ?? 0) - 1);
   const referenceImageCost = extraReferenceImages * (model.creditsPerReferenceImage ?? CREDITS_PER_REFERENCE_IMAGE);
-  return Math.max(MIN_VIDEO_CREDIT_COST, Math.ceil(durationCost + referenceImageCost));
+  return Math.max(opts.minVideoCreditCost ?? MIN_VIDEO_CREDIT_COST, Math.ceil(durationCost + referenceImageCost));
 }

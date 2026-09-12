@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from "react";
 import type { ModelCatalogInput } from "@/lib/actions/model-catalog";
+import { useTextLimits } from "@/app/_components/use-text-limits";
 
 export type ModelFormValues = ModelCatalogInput;
 
@@ -62,6 +63,7 @@ export function ModelForm({
   const [durationMax, setDurationMax] = useState(String(initial?.allowedDurations?.max ?? ""));
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const limits = useTextLimits();
 
   function set<K extends keyof ModelFormValues>(key: K, value: ModelFormValues[K]) {
     setValues((prev) => ({ ...prev, [key]: value }));
@@ -134,11 +136,17 @@ export function ModelForm({
             value={values.providerModelId}
             onChange={(e) => set("providerModelId", e.target.value)}
             placeholder="e.g. wan3.0-video-prime"
+            maxLength={limits.technical_id}
             className="input"
           />
         </Field>
         <Field label="Display name">
-          <input value={values.displayName} onChange={(e) => set("displayName", e.target.value)} className="input" />
+          <input
+            value={values.displayName}
+            onChange={(e) => set("displayName", e.target.value)}
+            maxLength={limits.name}
+            className="input"
+          />
         </Field>
       </div>
 
@@ -147,6 +155,7 @@ export function ModelForm({
           value={values.description ?? ""}
           onChange={(e) => set("description", e.target.value)}
           rows={2}
+          maxLength={limits.description}
           className="input"
         />
       </Field>
@@ -227,6 +236,7 @@ export function ModelForm({
               value={allowedResolutionsText}
               onChange={(e) => setAllowedResolutionsText(e.target.value)}
               placeholder="480p, 720p, 1080p"
+              maxLength={limits.description}
               className="input"
             />
           </Field>
@@ -238,6 +248,7 @@ export function ModelForm({
           value={allowedRatiosText}
           onChange={(e) => setAllowedRatiosText(e.target.value)}
           placeholder="16:9, 9:16, 1:1"
+          maxLength={limits.description}
           className="input"
         />
       </Field>

@@ -11,10 +11,11 @@ import { resolveAssetReferenceUrls } from "@/lib/media/asset-references";
 import { generateVideoWorkflow } from "@/lib/workflows/generate-video";
 import { buildCharacterSheetPrompt } from "@/lib/prompts/character-sheet";
 import { buildPropSheetPrompt } from "@/lib/prompts/prop-sheet";
-import { computeCreditCost } from "@/lib/billing/credit-costs";
+import { computeCreditCost, loadCreditCostSettings } from "@/lib/billing/credit-costs";
 import { requireCredits, recordSpend } from "@/lib/billing/spend-credits";
 import { loadActiveModel, loadDefaultActiveModel } from "@/lib/billing/resolve-model";
 import { withTransientRetry } from "@/lib/providers/retry";
+import { assertMaxLength, loadTextLimits } from "@/lib/text-limits";
 import { loadOwnedProject } from "./project-guard";
 import { runAction } from "./action-result";
 
@@ -130,6 +131,8 @@ export async function generateFreeformImages(
 ) {
   return runAction(async () => {
     const supabase = await createClient();
+    const limits = await loadTextLimits(supabase);
+    assertMaxLength(input.prompt, limits.prompt, "Prompt");
     const project = await loadOwnedProject(supabase, projectId);
     const model = await loadActiveModel(supabase, input.modelId, "image");
     const provider = getImageProvider(model.providerKey);
@@ -215,6 +218,8 @@ async function generateCharacterSheetImpl(
   input: { prompt: string; quantity: number; ratio?: string; modelId?: string },
 ) {
   const supabase = await createClient();
+  const limits = await loadTextLimits(supabase);
+  assertMaxLength(input.prompt, limits.prompt, "Prompt");
   const project = await loadOwnedProject(supabase, projectId);
   const model = input.modelId
     ? await loadActiveModel(supabase, input.modelId, "image")
@@ -367,6 +372,26 @@ async function autofillAssetImagesImpl(projectId: string, type: string) {
   );
 }
 
+/**
+ * "From scene" mode passes a real scene id, but the scene's *number* on the
+ * card/filename must match what the Scenes tab itself shows ("Scene 1",
+ * "Scene 2", ...) — the scene's 1-based position among the project's scenes
+ * ordered by order_index, not order_index's raw value (see scene-list.tsx,
+ * which numbers cards the same way via array index rather than order_index
+ * directly). Returns null if the scene can't be found (e.g. a stale
+ * selection from a since-regenerated breakdown) — callers should still
+ * generate the video, just without a scene number attached.
+ */
+async function resolveSceneNumber(supabase: Supabase, projectId: string, sceneId: string): Promise<number | null> {
+  const { data: scenes } = await supabase
+    .from("scenes")
+    .select("id")
+    .eq("project_id", projectId)
+    .order("order_index", { ascending: true });
+  const index = (scenes ?? []).findIndex((scene) => scene.id === sceneId);
+  return index === -1 ? null : index + 1;
+}
+
 export async function generateVideoFromImage(
   projectId: string,
   input: {
@@ -378,6 +403,8 @@ export async function generateVideoFromImage(
     prompt: string | null;
     /** Freeform scene context ("From scene" mode only — see GenerateVideoInput.sceneContext) — the breakdown's scene summary plus any per-character wardrobe notes, merged into the generation prompt alongside `prompt` itself. */
     sceneContext?: string;
+    /** The selected scene's id, "From scene" mode only — resolved to a display scene_number and snapshotted onto the generation row (see resolveSceneNumber above), so the card/download filename can show "Scene N" without a live join back to a scene that may later be deleted/regenerated. */
+    sceneId?: string;
     durationSeconds: number;
     resolution?: string;
     ratio?: string;
@@ -397,8 +424,11 @@ async function generateVideoFromImageImpl(
   if (!input.sourceUrl && !input.referenceAssetIds?.length) {
     throw new Error("Provide a source image or at least one reference character.");
   }
-
   const supabase = await createClient();
+  const limits = await loadTextLimits(supabase);
+  if (input.prompt) assertMaxLength(input.prompt, limits.prompt, "Prompt");
+  if (input.sceneContext) assertMaxLength(input.sceneContext, limits.prompt, "Scene context");
+
   const project = await loadOwnedProject(supabase, projectId);
   const model = await loadActiveModel(supabase, input.modelId, "video");
   const provider = getVideoProvider(model.providerKey);
@@ -413,16 +443,19 @@ async function generateVideoFromImageImpl(
   // provider call fanning out into N outputs.
   const quantity = clampVideoQuantity(input.quantity ?? 1);
   const batchId = quantity > 1 ? crypto.randomUUID() : null;
+  const sceneNumber = input.sceneId ? await resolveSceneNumber(supabase, projectId, input.sceneId) : null;
 
   // BytePlus drops reference images outright whenever a source/first-frame
   // image is present (see byteplus-adapter.ts) — the first-frame image is
   // then the only image input actually sent, same as a single reference
   // image, so it's billed the same way (count=1) rather than 0.
   const referenceImageCount = input.sourceUrl ? 1 : (referenceImageUrls?.length ?? 0);
+  const costSettings = await loadCreditCostSettings(supabase);
   const creditCost = computeCreditCost(model, {
     durationSeconds: input.durationSeconds,
     resolution: input.resolution,
     referenceImageCount,
+    minVideoCreditCost: costSettings.minVideoCreditCost,
   });
   await requireCredits(project.userId, creditCost * quantity);
 
@@ -440,6 +473,7 @@ async function generateVideoFromImageImpl(
         model: model.providerModelId,
         source_upload_id: input.sourceUploadId ?? null,
         batch_id: batchId,
+        scene_number: sceneNumber,
         params: {
           sourceUrl: input.sourceUrl ?? null,
           sourceIsStoryboard: input.sourceIsStoryboard ?? false,

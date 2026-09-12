@@ -2,10 +2,12 @@
 
 import { useActionState, useEffect, useRef } from "react";
 import { submitContactForm, type ContactState } from "@/lib/actions/contact";
+import { useTextLimits } from "@/app/_components/use-text-limits";
 
 export function ContactForm() {
   const [state, action, pending] = useActionState<ContactState, FormData>(submitContactForm, undefined);
   const formRef = useRef<HTMLFormElement>(null);
+  const limits = useTextLimits();
 
   useEffect(() => {
     if (state?.message) {
@@ -27,6 +29,7 @@ export function ContactForm() {
             name="name"
             type="text"
             required
+            maxLength={limits.name}
             className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground outline-none focus:border-border-strong"
           />
         </div>
@@ -39,6 +42,7 @@ export function ContactForm() {
             name="email"
             type="email"
             required
+            maxLength={limits.email}
             className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground outline-none focus:border-border-strong"
           />
         </div>
@@ -52,6 +56,7 @@ export function ContactForm() {
           id="phone"
           name="phone"
           type="tel"
+          maxLength={limits.short_text}
           className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground outline-none focus:border-border-strong"
         />
       </div>
@@ -65,6 +70,7 @@ export function ContactForm() {
           name="message"
           required
           rows={5}
+          maxLength={limits.instructions}
           className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground outline-none focus:border-border-strong"
         />
       </div>

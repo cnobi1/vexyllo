@@ -15,7 +15,7 @@ import {
   type StoryboardGrid,
   type StoryboardShot,
 } from "@/lib/prompts/scene-storyboard";
-import { computeCreditCost } from "@/lib/billing/credit-costs";
+import { computeCreditCost, loadCreditCostSettings } from "@/lib/billing/credit-costs";
 import { requireCredits, recordSpend } from "@/lib/billing/spend-credits";
 import { loadActiveModel } from "@/lib/billing/resolve-model";
 import { withTransientRetry } from "@/lib/providers/retry";
@@ -210,9 +210,11 @@ export async function generateShotVideo(shotId: string, modelId: string) {
   const model = await loadActiveModel(supabase, modelId, "video");
 
   const provider = getVideoProvider(model.providerKey);
+  const costSettings = await loadCreditCostSettings(supabase);
   const creditCost = computeCreditCost(model, {
     durationSeconds: DEFAULT_SHOT_VIDEO_DURATION_SECONDS,
     referenceImageCount: referenceImageUrls?.length ?? 0,
+    minVideoCreditCost: costSettings.minVideoCreditCost,
   });
   await requireCredits(userId, creditCost);
 

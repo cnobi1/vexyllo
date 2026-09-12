@@ -3,11 +3,13 @@
 import { useState, useTransition, type FormEvent } from "react";
 import { createAsset } from "@/lib/actions/assets";
 import { isActionError } from "@/lib/actions/action-result";
+import { useTextLimits } from "@/app/_components/use-text-limits";
 
 /** Plain onSubmit (not `<form action={createAsset}>`) so a failed insert shows its real message. */
 export function CreateCharacterForm({ projectId }: { projectId: string }) {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const limits = useTextLimits();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -31,12 +33,14 @@ export function CreateCharacterForm({ projectId }: { projectId: string }) {
         name="name"
         placeholder="Character name"
         required
+        maxLength={limits.name}
         className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
       />
       <textarea
         name="description"
         placeholder="Description — appearance, personality, wardrobe…"
         rows={2}
+        maxLength={limits.prompt}
         className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
       />
       <button

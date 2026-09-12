@@ -1,7 +1,7 @@
 import Stripe from "stripe";
 import { NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { getPlan, isPlanId, type PlanId } from "@/lib/billing/plans";
+import { loadPlan, isPlanId, type PlanId } from "@/lib/billing/plans";
 
 const STRIPE_SECRET_KEY = process.env.STRIPE_SECRET_KEY;
 const STRIPE_WEBHOOK_SECRET = process.env.STRIPE_WEBHOOK_SECRET;
@@ -99,7 +99,7 @@ export async function POST(request: Request) {
         // to reconcile. Ack with 200 so Stripe doesn't keep retrying.
         break;
       }
-      const plan = getPlan(planId);
+      const plan = await loadPlan(supabase, planId);
 
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       const { error: subError } = await supabase.from("subscriptions").upsert(
@@ -141,7 +141,7 @@ export async function POST(request: Request) {
         .maybeSingle();
       if (lookupError) throw new Error(lookupError.message);
       if (!existing || !isPlanId(existing.plan)) break;
-      const plan = getPlan(existing.plan as PlanId);
+      const plan = await loadPlan(supabase, existing.plan as PlanId);
 
       const subscription = await stripe.subscriptions.retrieve(subscriptionId);
       const { error: updateError } = await supabase

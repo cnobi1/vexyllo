@@ -1,3 +1,4 @@
+import { createClient } from "@/lib/supabase/client";
 import { StatusPill } from "./status-pill";
 import { GenerationMedia } from "./generation-media";
 
@@ -9,7 +10,59 @@ export type MediaGridItem = {
   storage_path?: string | null;
   params?: { prompt?: string } | null;
   error: string | null;
+  /** 1-based scene position (matching the Scenes tab's own "Scene N" numbering), snapshotted at generation time for videos made via the Videos tab's "From scene" mode — see resolveSceneNumber in media.ts. Null for everything else. */
+  scene_number?: number | null;
 };
+
+const SIGNED_URL_TTL_SECONDS = 60 * 60;
+
+function extensionForMime(mime: string, type: string): string {
+  if (mime.includes("mp4")) return "mp4";
+  if (mime.includes("webm")) return "webm";
+  if (mime.includes("quicktime")) return "mov";
+  if (mime.includes("png")) return "png";
+  if (mime.includes("webp")) return "webp";
+  if (mime.includes("jpeg")) return "jpg";
+  return type === "video" ? "mp4" : "png";
+}
+
+/**
+ * Fetches the media as a blob and saves it via a synthetic same-origin
+ * object-URL link — the only reliable way to control the saved filename.
+ * A plain `<a href download>` pointed straight at a cross-origin Supabase
+ * Storage signed URL isn't consistently honored by browsers (no
+ * Content-Disposition: attachment header from Storage), so it can't be used
+ * here. Re-signs from storage_path first, same as GenerationMedia, since a
+ * persisted output_url may be an expired 1h-TTL signed URL.
+ */
+async function downloadItem(item: MediaGridItem) {
+  let url = item.output_url;
+  if (item.storage_path) {
+    const { data } = await createClient().storage.from("media").createSignedUrl(item.storage_path, SIGNED_URL_TTL_SECONDS);
+    if (data) url = data.signedUrl;
+  }
+  if (!url) return;
+
+  const response = await fetch(url);
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  const namePrefix = item.scene_number ? `Scene ${item.scene_number} - ${item.type}` : `${item.type}-${item.id.slice(0, 8)}`;
+  const anchor = document.createElement("a");
+  anchor.href = objectUrl;
+  anchor.download = `${namePrefix}.${extensionForMime(blob.type, item.type)}`;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  URL.revokeObjectURL(objectUrl);
+}
+
+function DownloadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.75} className="h-[14px] w-[14px]">
+      <path d="M12 4v12m0 0-4-4m4 4 4-4M5 20h14" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
 
 function TrashIcon() {
   return (
@@ -61,9 +114,26 @@ export function MediaGrid({
         return (
           <li key={item.id} className="card-glow rounded-2xl p-3">
             <div className="flex items-center justify-between gap-2">
-              <span className="text-xs font-medium capitalize text-foreground">{item.type}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-medium capitalize text-foreground">{item.type}</span>
+                {item.scene_number != null && (
+                  <span className="rounded-full border border-border px-2 py-0.5 text-xs font-medium text-muted">
+                    Scene {item.scene_number}
+                  </span>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <StatusPill status={item.status} />
+                {item.status === "succeeded" && item.output_url && (
+                  <button
+                    type="button"
+                    onClick={() => downloadItem(item)}
+                    aria-label="Download"
+                    className="flex h-6 w-6 items-center justify-center rounded-md text-muted transition-colors hover:bg-primary/10 hover:text-primary"
+                  >
+                    <DownloadIcon />
+                  </button>
+                )}
                 {onDelete && (
                   <button
                     type="button"

@@ -75,88 +75,90 @@ export default async function DashboardPage() {
 
   return (
     <div className="relative flex flex-1 flex-col">
-      <div className="hero-glow" aria-hidden="true" />
-      <div className="relative flex flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4">
-          <Link href="/dashboard">
-            <Logo className="h-7 w-auto" />
-          </Link>
-          <div className="flex items-center gap-3">
-            <CreditBadge userId={user?.id ?? ""} initialBalance={subscription?.credit_balance ?? null} />
-            <UserMenu email={user?.email ?? ""} displayName={displayName} avatarUrl={avatarUrl} isAdmin={isAdmin} />
-          </div>
-        </header>
-
-        <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-10 px-6 py-14">
-          <section className="relative h-56 w-full overflow-hidden rounded-2xl sm:h-72">
-            <Image
-              src="/marketing/services-scene-characters.jpg"
-              alt=""
-              fill
-              priority
-              sizes="(min-width: 1280px) 1280px, 100vw"
-              className="object-cover"
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-background via-background/40 to-transparent" />
-            <div className="absolute inset-0 flex flex-col justify-end gap-1 p-6 sm:p-8">
-              <h2 className="text-3xl font-bold text-white sm:text-4xl">
-                Welcome back{firstName ? `, ${firstName}` : ""}
-              </h2>
-              <p className="text-sm text-white/80">Pick up where you left off, or start something new.</p>
-            </div>
-          </section>
-
-          <CreateProjectForm />
-
-          <section className="flex flex-col gap-4">
-            <h2 className="text-base font-semibold text-foreground">Your projects</h2>
-            {projects && projects.length > 0 ? (
-              <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                {projects.map((project) => {
-                  const thumbnail = thumbnailByProject.get(project.id);
-                  return (
-                    <li key={project.id} className="group relative">
-                      <Link
-                        href={`/projects/${project.id}`}
-                        className="card-glow flex h-full flex-col overflow-hidden rounded-2xl hover:border-border-strong hover:bg-surface-hover"
-                      >
-                        <div className="flex aspect-video items-center justify-center overflow-hidden bg-background/60 text-muted-2">
-                          {thumbnail ? (
-                            // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL, not a next/image-optimizable remote asset
-                            <img src={thumbnail} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            <ProjectPlaceholderIcon />
-                          )}
-                        </div>
-                        <div className="flex flex-1 flex-col justify-between gap-3 p-5">
-                          <span className="pr-8 font-medium text-foreground group-hover:gradient-text">
-                            {project.title}
-                          </span>
-                          <div className="flex items-center justify-between gap-2">
-                            {project.style ? (
-                              <span className="w-fit rounded-full border border-border bg-background/60 px-2.5 py-1 text-xs text-muted">
-                                {project.style}
-                              </span>
-                            ) : (
-                              <span className="text-xs text-muted-2">No style set</span>
-                            )}
-                            <span className="shrink-0 text-xs text-muted-2">{formatRelativeDate(project.created_at)}</span>
-                          </div>
-                        </div>
-                      </Link>
-                      <DeleteProjectButton projectId={project.id} projectTitle={project.title} />
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <p className="mx-auto w-full max-w-3xl rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted">
-                No projects yet — create your first one above.
-              </p>
-            )}
-          </section>
-        </main>
+      {/* Fixed-height background layer, NOT wrapping the header — the header
+          needs to stay a direct child of this full-page container so its
+          sticky containing block spans the whole page. Same pattern as
+          billing/page.tsx. */}
+      <div className="absolute inset-x-0 top-0 -z-10 h-[320px] overflow-hidden sm:h-[380px]">
+        <Image
+          src="/marketing/services-scene-characters.jpg"
+          alt=""
+          fill
+          priority
+          sizes="100vw"
+          className="object-cover"
+        />
+        <div className="absolute inset-0 bg-gradient-to-b from-background/20 via-background/70 to-background" />
       </div>
+
+      <header className="sticky top-0 z-10 flex items-center justify-between px-6 py-4">
+        <Link href="/dashboard">
+          <Logo className="h-7 w-auto" />
+        </Link>
+        <div className="flex items-center gap-3">
+          <CreditBadge userId={user?.id ?? ""} initialBalance={subscription?.credit_balance ?? null} />
+          <UserMenu email={user?.email ?? ""} displayName={displayName} avatarUrl={avatarUrl} isAdmin={isAdmin} />
+        </div>
+      </header>
+
+      <div className="relative mx-auto flex w-full max-w-7xl flex-col gap-1 px-6 pb-8 pt-16 sm:pt-20">
+        <h2 className="text-3xl font-bold text-foreground sm:text-4xl">
+          Welcome back{firstName ? `, ${firstName}` : ""}
+        </h2>
+        <p className="text-sm text-muted">Pick up where you left off, or start something new.</p>
+      </div>
+
+      <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-10 px-6 pb-14">
+        <CreateProjectForm />
+
+        <section className="flex flex-col gap-4">
+          <h2 className="text-base font-semibold text-foreground">Your projects</h2>
+          {projects && projects.length > 0 ? (
+            <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {projects.map((project) => {
+                const thumbnail = thumbnailByProject.get(project.id);
+                return (
+                  <li key={project.id} className="group relative">
+                    <Link
+                      href={`/projects/${project.id}`}
+                      className="card-glow flex h-full flex-col overflow-hidden rounded-2xl hover:border-border-strong hover:bg-surface-hover"
+                    >
+                      <div className="flex aspect-video items-center justify-center overflow-hidden bg-background/60 text-muted-2">
+                        {thumbnail ? (
+                          // eslint-disable-next-line @next/next/no-img-element -- signed Storage URL, not a next/image-optimizable remote asset
+                          <img src={thumbnail} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <ProjectPlaceholderIcon />
+                        )}
+                      </div>
+                      <div className="flex flex-1 flex-col justify-between gap-3 p-5">
+                        <span className="pr-8 font-medium text-foreground group-hover:gradient-text">
+                          {project.title}
+                        </span>
+                        <div className="flex items-center justify-between gap-2">
+                          {project.style ? (
+                            <span className="w-fit rounded-full border border-border bg-background/60 px-2.5 py-1 text-xs text-muted">
+                              {project.style}
+                            </span>
+                          ) : (
+                            <span className="text-xs text-muted-2">No style set</span>
+                          )}
+                          <span className="shrink-0 text-xs text-muted-2">{formatRelativeDate(project.created_at)}</span>
+                        </div>
+                      </div>
+                    </Link>
+                    <DeleteProjectButton projectId={project.id} projectTitle={project.title} />
+                  </li>
+                );
+              })}
+            </ul>
+          ) : (
+            <p className="mx-auto w-full max-w-3xl rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted">
+              No projects yet — create your first one above.
+            </p>
+          )}
+        </section>
+      </main>
     </div>
   );
 }

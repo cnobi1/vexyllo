@@ -4,6 +4,7 @@ import { useState, useTransition, type FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { createProject } from "@/lib/actions/projects";
 import { isActionError } from "@/lib/actions/action-result";
+import { useTextLimits } from "@/app/_components/use-text-limits";
 import { SparkleIcon } from "../../_components/sparkle-icon";
 import { NewProjectStyleField } from "./new-project-style-field";
 
@@ -25,6 +26,7 @@ export function CreateProjectForm() {
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const router = useRouter();
+  const limits = useTextLimits();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -66,6 +68,7 @@ export function CreateProjectForm() {
               name="title"
               placeholder="Project title, e.g. Neon Skyline"
               required
+              maxLength={limits.name}
               className="rounded-lg border border-border bg-background/60 px-3 py-2.5 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
             />
           </div>

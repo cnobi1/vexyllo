@@ -3,9 +3,10 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getBillingProvider } from "@/lib/providers/billing";
-import { PLANS, isPlanId } from "@/lib/billing/plans";
+import { loadPlans, isPlanId } from "@/lib/billing/plans";
 import { TOPUP_PACKS } from "@/lib/billing/topup-packs";
-import { BILLING_FAQS } from "@/lib/billing/faqs";
+import { buildBillingFaqs } from "@/lib/billing/faqs";
+import { loadCreditCostSettings, videoCreditCost } from "@/lib/billing/credit-costs";
 import { SubscribeButton, CancelButton, TopUpButton } from "./_components/plan-actions";
 import { Logo } from "../_components/logo";
 import { PlanCard } from "../_components/plan-card";
@@ -39,6 +40,10 @@ export default async function BillingPage({
   const provider = getBillingProvider();
   const isDemo = provider.name === "mock";
   const currentPlanId = subscription && isPlanId(subscription.plan) ? subscription.plan : null;
+
+  const [plans, costSettings] = await Promise.all([loadPlans(supabase), loadCreditCostSettings(supabase)]);
+  const creditsPerVideoSecond1080p = videoCreditCost(1, "1080p", costSettings.minVideoCreditCost);
+  const billingFaqs = buildBillingFaqs(creditsPerVideoSecond1080p);
 
   return (
     <div className="relative flex flex-1 flex-col">
@@ -165,13 +170,14 @@ export default async function BillingPage({
         <section className="flex flex-col gap-6">
           <h2 className="text-base font-semibold text-foreground">Plans</h2>
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 sm:items-start">
-            {PLANS.map((plan) => {
+            {plans.map((plan) => {
               const variant = plan.id === "pro" ? "featured" : plan.id === "studio" ? "top" : "default";
               return (
                 <PlanCard
                   key={plan.id}
                   plan={plan}
                   cta={<SubscribeButton planId={plan.id} isCurrent={currentPlanId === plan.id} variant={variant} />}
+                  creditsPerVideoSecond1080p={creditsPerVideoSecond1080p}
                 />
               );
             })}
@@ -184,7 +190,7 @@ export default async function BillingPage({
         <section className="mx-auto w-full max-w-2xl">
           <h2 className="mb-6 text-center text-xl font-semibold text-foreground">Questions</h2>
           <div className="flex flex-col gap-4">
-            {BILLING_FAQS.map((faq) => (
+            {billingFaqs.map((faq) => (
               <div key={faq.question} className="card-glow rounded-2xl p-5">
                 <h3 className="text-sm font-semibold text-foreground">{faq.question}</h3>
                 <p className="mt-1 text-sm text-muted">{faq.answer}</p>

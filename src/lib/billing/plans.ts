@@ -1,3 +1,5 @@
+import type { createClient } from "@/lib/supabase/server";
+
 export type PlanId = "starter" | "pro" | "studio";
 
 export interface Plan {
@@ -40,4 +42,22 @@ export function getPlan(id: PlanId): Plan {
 
 export function isPlanId(value: string): value is PlanId {
   return PLANS.some((p) => p.id === value);
+}
+
+// Admin-tunable credit allotment per plan — editable at /admin/subscriptions
+// with no code deploy. Price/name/stripePriceId deliberately stay static
+// (see the subscription_plans migration's comment: Stripe doesn't allow
+// editing an existing Price's amount, so price isn't a DB-row concern).
+// Falls back to the hardcoded PLANS value above if the DB read fails or a
+// row is missing, same defensive pattern as text-limits.ts/credit-costs.ts.
+export async function loadPlans(supabase: Awaited<ReturnType<typeof createClient>>): Promise<Plan[]> {
+  const { data } = await supabase.from("subscription_plans").select("id, monthly_credits");
+  const creditsById = new Map((data ?? []).map((row) => [row.id, row.monthly_credits]));
+  return PLANS.map((plan) => ({ ...plan, monthlyCredits: creditsById.get(plan.id) ?? plan.monthlyCredits }));
+}
+
+export async function loadPlan(supabase: Awaited<ReturnType<typeof createClient>>, id: PlanId): Promise<Plan> {
+  const plan = getPlan(id);
+  const { data } = await supabase.from("subscription_plans").select("monthly_credits").eq("id", id).maybeSingle();
+  return data ? { ...plan, monthlyCredits: data.monthly_credits } : plan;
 }

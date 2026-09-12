@@ -11,6 +11,7 @@ import { AssetGenerationWorkspace } from "../_components/asset-generation-worksp
 import { ZoomableImage } from "../_components/zoomable-image";
 import { useAssetPrimaryImage } from "../_components/use-asset-primary-image";
 import type { MediaGridItem } from "../_components/media-grid";
+import { useTextLimits } from "@/app/_components/use-text-limits";
 
 const SECTION_ORDER = ["character", "location", "prop"] as const;
 const SECTION_LABEL: Record<string, string> = { character: "Characters", location: "Locations", prop: "Props" };
@@ -18,6 +19,15 @@ const ASSET_TYPE_LABEL: Record<string, string> = { character: "Character", locat
 
 type Asset = { id: string; type: string; name: string; description: string | null };
 type Generation = MediaGridItem & { kind: string; asset_id?: string | null; created_at: string };
+
+function SpinnerIcon() {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 animate-spin">
+      <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="2.5" strokeOpacity="0.25" />
+      <path d="M21 12a9 9 0 0 0-9-9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
+    </svg>
+  );
+}
 
 /**
  * Overview of every character/location/prop extracted from the script, with
@@ -100,9 +110,11 @@ function AssetCard({
 }) {
   const [description, setDescription] = useState(asset.description ?? "");
   const [showGenerate, setShowGenerate] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(() => initialGenerations.some((g) => g.status === "pending"));
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const imageUrl = useAssetPrimaryImage(projectId, asset.id, initialImageUrl);
   const [saveState, saveAction] = useActionForm(updateAsset.bind(null, projectId, asset.id));
+  const limits = useTextLimits();
 
   return (
     <li className="card-glow flex flex-col gap-3 rounded-xl p-4 text-sm">
@@ -121,10 +133,25 @@ function AssetCard({
       </div>
 
       {imageUrl ? (
-        <ZoomableImage url={imageUrl} alt={asset.name} />
+        <div className="relative">
+          <ZoomableImage url={imageUrl} alt={asset.name} />
+          {isGenerating && (
+            <div className="absolute inset-0 flex items-center justify-center gap-2 rounded-lg bg-background/70 text-xs font-medium text-foreground backdrop-blur-sm">
+              <SpinnerIcon />
+              Generating…
+            </div>
+          )}
+        </div>
       ) : (
         <div className="flex aspect-square w-full items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-2">
-          No image yet
+          {isGenerating ? (
+            <span className="flex items-center gap-2 text-foreground">
+              <SpinnerIcon />
+              Generating…
+            </span>
+          ) : (
+            "No image yet"
+          )}
         </div>
       )}
 
@@ -133,7 +160,7 @@ function AssetCard({
         onClick={() => setShowGenerate((prev) => !prev)}
         className="btn-primary self-stretch rounded-full px-4 py-1.5 text-xs font-medium text-white"
       >
-        {showGenerate ? "Hide generate" : "✦ Generate"}
+        {showGenerate ? "Hide generate" : isGenerating ? "✦ Generate (in progress…)" : "✦ Generate"}
       </button>
 
       {showGenerate && (
@@ -144,6 +171,7 @@ function AssetCard({
             initialItems={initialGenerations}
             columns={2}
             showPrompt={false}
+            onPendingChange={setIsGenerating}
           />
         </div>
       )}
@@ -156,6 +184,7 @@ function AssetCard({
           value={description}
           onChange={setDescription}
           placeholder="Describe its appearance…"
+          maxLength={limits.prompt}
         />
         <SubmitButton
           label="Save"

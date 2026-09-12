@@ -13,6 +13,8 @@ import { QuantityControl } from "../_components/quantity-control";
 import { ModelSelectControl, pickDefaultModelId, type ModelOption } from "../_components/model-select-control";
 import { GenerationMedia } from "../_components/generation-media";
 import { PromptMentionField, extractMentionedAssetIds, type MentionAssetOption } from "../_components/prompt-mention-field";
+import { useTextLimits } from "@/app/_components/use-text-limits";
+import { useCreditCostSettings } from "@/app/_components/use-credit-cost-settings";
 
 type SourceOption = { id: string; url: string };
 type SceneAssetLink = { asset_id: string; wardrobe_note: string | null };
@@ -132,6 +134,8 @@ export function VideoGenerateForm({
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [isUploading, startUploadTransition] = useTransition();
+  const limits = useTextLimits();
+  const costSettings = useCreditCostSettings();
 
   const minDuration = selectedModel?.allowedDurations?.min ?? 2;
   const maxDuration = selectedModel?.allowedDurations?.max ?? 12;
@@ -170,7 +174,12 @@ export function VideoGenerateForm({
   // see media.ts:generateVideoFromImage's own referenceImageCount comment.
   const referenceImageCount = sourceUrl ? 1 : referenceAssetIds.length;
   const creditCost = selectedModel
-    ? computeCreditCost(selectedModel, { durationSeconds: duration, resolution, referenceImageCount }) * quantity
+    ? computeCreditCost(selectedModel, {
+        durationSeconds: duration,
+        resolution,
+        referenceImageCount,
+        minVideoCreditCost: costSettings.minVideoCreditCost,
+      }) * quantity
     : 0;
 
   const wardrobeNoteByAssetId = useMemo(() => {
@@ -301,6 +310,7 @@ export function VideoGenerateForm({
         sourceIsStoryboard: sourceMode === "scene" && Boolean(sourceUrl),
         prompt: prompt.trim() || null,
         sceneContext,
+        sceneId: sourceMode === "scene" ? (selectedSceneId ?? undefined) : undefined,
         durationSeconds: duration,
         ratio: ratio || undefined,
         resolution,
@@ -454,6 +464,7 @@ export function VideoGenerateForm({
             options={assetOptions}
             mentionStyle="screenplay"
             placeholder={"Dialogue for this scene… type @ then a character's name to tag who's speaking, e.g.\n@CHLOE\nSir, they're... inflated."}
+            maxLength={limits.prompt}
           />
         </>
       ) : (
@@ -530,6 +541,7 @@ export function VideoGenerateForm({
             options={assetOptions}
             mentionStyle="inline"
             placeholder="Describe the motion/action for this shot… type @ to reference a character, location, or prop"
+            maxLength={limits.prompt}
           />
         </>
       )}

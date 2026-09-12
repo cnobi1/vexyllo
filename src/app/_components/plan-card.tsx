@@ -3,8 +3,6 @@ import type { Plan } from "@/lib/billing/plans";
 import { IMAGE_CREDIT_COST, videoCreditCost } from "@/lib/billing/credit-costs";
 import { CheckIcon } from "./check-icon";
 
-const CREDITS_PER_1080P_SECOND = videoCreditCost(1, "1080p");
-
 /**
  * Shared plan-card shell for /pricing (logged-out) and /billing
  * (authenticated) — same pitch (price, credits, feature checklist,
@@ -12,9 +10,20 @@ const CREDITS_PER_1080P_SECOND = videoCreditCost(1, "1080p");
  * pricing links to /signup, billing renders SubscribeButton/CancelButton
  * wired to the real Stripe flow — so the CTA is a slot, not baked in here.
  */
-export function PlanCard({ plan, cta, featuredBadge = true }: { plan: Plan; cta: ReactNode; featuredBadge?: boolean }) {
+export function PlanCard({
+  plan,
+  cta,
+  featuredBadge = true,
+  creditsPerVideoSecond1080p = videoCreditCost(1, "1080p"),
+}: {
+  plan: Plan;
+  cta: ReactNode;
+  featuredBadge?: boolean;
+  /** Live value from credit_cost_settings ('min_video_floor') — see faqs.ts's buildBillingFaqs for the same reasoning. Defaults to the hardcoded constant if a caller hasn't loaded live settings. */
+  creditsPerVideoSecond1080p?: number;
+}) {
   const approxImages = Math.floor(plan.monthlyCredits / IMAGE_CREDIT_COST);
-  const approxVideoSeconds = Math.floor(plan.monthlyCredits / CREDITS_PER_1080P_SECOND);
+  const approxVideoSeconds = Math.floor(plan.monthlyCredits / creditsPerVideoSecond1080p);
   const isFeatured = plan.id === "pro";
 
   return (

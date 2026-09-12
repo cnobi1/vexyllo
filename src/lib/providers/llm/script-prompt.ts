@@ -23,6 +23,24 @@ const CINEMATIC_CRAFT_BRIEF = [
   "Draw on precise filmmaking vocabulary when it's the most efficient way to say what you mean — shot types (establishing, wide, medium, close-up, extreme close-up, over-the-shoulder, POV, two-shot, low-angle, high-angle, bird's-eye), camera movement (push-in, pull-back, tracking, dolly, pan, tilt, orbit, crane, handheld, static locked-off), lens/depth (shallow depth of field, deep focus, rack focus, background separation), lighting (golden-hour, backlight, rim light, low-key, high-key, practical, volumetric), and composition (rule of thirds, symmetry, leading lines, silhouette). Use these as tools for specificity, not decoration — a plain action line is still correct when nothing cinematic is actually happening.",
 ].join("\n");
 
+// Shared by all three script-facing prompts, same reasoning as
+// CINEMATIC_CRAFT_BRIEF above: character/location/prop descriptions written
+// here flow unchanged into the image-generation prompt builders
+// (src/lib/prompts/*.ts), which have no way to add or correct cultural
+// specificity themselves — they only wrap whatever text they're given. So a
+// vague or default-Western description produced here becomes a
+// vague/default-Western image downstream with no chance to fix it later.
+const SETTING_AUTHENTICITY_BRIEF = [
+  "If the story specifies or clearly implies a real-world country, region, culture, or ethnicity, every description must render that setting authentically and specifically, not generically:",
+  "- People: skin tone, facial features, hair texture/style, and build should reflect the people of that region — describe them concretely, not with a generic/default look.",
+  "- Dressing: clothing, fabrics, and styles worn day-to-day and for specific occasions in that culture, not a generic wardrobe.",
+  "- Housing & environment: architecture, building materials, interiors, streets, and landscape as they actually look in that setting.",
+  "- Food & everyday objects: dishes, ingredients, and household items specific to that culture, named precisely (e.g. \"jollof rice\" rather than \"a rice dish\") wherever the story calls for them.",
+  "- Speech: how people actually talk in that setting — accent, phrasing, local expressions — reflected in dialogue and character voice, not generic neutral English.",
+  "Ground every detail in the real culture rather than a stereotype or caricature of it — write with the same concrete specificity someone from that place would recognize as accurate.",
+  "If the story doesn't specify or imply a real-world setting, don't invent one — keep descriptions setting-neutral, as they'd otherwise be.",
+].join("\n");
+
 const LENGTH_BRIEF: Record<GenerateScriptInput["length"], string> = {
   short:
     "Write a short film script: a tight, self-contained story told in roughly 3-6 scenes, storyboardable shot by shot in one sitting.",
@@ -38,6 +56,7 @@ export function buildScriptPrompt({ idea, style, length }: GenerateScriptInput):
     LENGTH_BRIEF[length],
     "Write the full script in standard screenplay format: scene headings (INT./EXT. LOCATION - DAY/NIGHT), brief action/description lines, and dialogue with the speaking character's name in capital letters on its own line directly above their line.",
     CINEMATIC_CRAFT_BRIEF,
+    SETTING_AUTHENTICITY_BRIEF,
     "Use a single blank line to separate elements (scene heading, action, character cue, dialogue). Never use manual spaces to indent or center text, and never output more than one consecutive blank line.",
     "Give characters distinct, believable voices.",
     "Also write a short, compelling title for the film.",
@@ -67,6 +86,7 @@ export function buildBreakdownPrompt({
       : null,
     "Also extract the recurring characters, locations, and props referenced across the script as assets.",
     "Each asset's description is handed to an image model on its own, with no other asset's description alongside it for contrast — so it must fully specify what makes this asset look like itself and nobody/nothing else, not lean on the reader inferring a contrast from the rest of the cast. For characters in particular: two characters who share an age bracket, gender, and role (e.g. two 50s Nigerian businesswomen, two doctors) will render as visually near-identical unless each description calls out specific, individuating physical details — face shape, distinguishing marks (scar, mole, gap tooth), build, a specific hairstyle or feature — not just demographic/role/personality descriptors like \"50s, stern, businesswoman\" that could equally describe several other characters in the same script.",
+    SETTING_AUTHENTICITY_BRIEF,
     "For each scene, list which of those assets (by their exact name, verbatim) appear in it — this is what keeps a character/location/prop's generated appearance consistent across every scene it's in, so it needs to be accurate, not just a stylistic label.",
     "For every character asset that appears in a scene, also add a wardrobe entry describing what they're wearing in that specific scene: pull it verbatim if the script includes explicit wardrobe/costume notes (e.g. bracketed [WARDROBE: ...] blocks); otherwise infer a reasonable, specific costume description consistent with the character and the scene's context. Locations and props never get wardrobe entries.",
     "Script:",
@@ -84,6 +104,7 @@ export function buildEnhanceScriptPrompt({ scriptText, style, instructions }: En
     style ? `Visual style for this project: ${style}.` : null,
     instructions ? `The writer specifically asked you to focus on: ${instructions}` : null,
     CINEMATIC_CRAFT_BRIEF,
+    SETTING_AUTHENTICITY_BRIEF,
     "Return the complete enhanced script in standard screenplay format, and a short, compelling title.",
     "Use a single blank line to separate elements (scene heading, action, character cue, dialogue). Never use manual spaces to indent or center text, and never output more than one consecutive blank line.",
     "Original script:",

@@ -95,6 +95,9 @@ ${panelLines}
 IMPORTANT CONSISTENCY:
 Keep every character, location, and prop visually identical across all panels — the same faces, wardrobe, set dressing, and props must appear in every panel featuring them, as if drawn by the same storyboard artist in one sitting. Do not redesign or reinterpret anything between panels.
 
+IMPORTANT SETTING FIDELITY:
+If the scene description above specifies or implies a real-world country, region, culture, or ethnicity, render the people (skin tone, features, hair, clothing), architecture/housing, environment, and any food or everyday objects exactly as true to that place as the description calls for — do not soften, generalize, or drift toward a default/Western look in any panel.
+
 RENDERING QUALITY:
 Professional film pre-production storyboard art, clean linework, clear staging and camera framing within each panel, legible at a glance, high resolution.`;
 }

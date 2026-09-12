@@ -22,6 +22,7 @@ export function AssetGenerationWorkspace({
   initialItems,
   columns,
   showPrompt,
+  onPendingChange,
 }: {
   projectId: string;
   assetId: string;
@@ -29,6 +30,8 @@ export function AssetGenerationWorkspace({
   columns?: 2 | 3;
   /** Set false when the prompt is already shown/editable elsewhere (e.g. the Assets tab's own description field). Defaults true. */
   showPrompt?: boolean;
+  /** Passed straight through to GenerationFeed — lets a caller (e.g. AssetsList's card) show a generating indicator on the asset's main image, outside this workspace's own collapsed accordion. */
+  onPendingChange?: (hasPending: boolean) => void;
 }) {
   const [prefill, setPrefill] = useState<{ value: string; nonce: number } | null>(null);
   const [mode, setMode] = useState<"generate" | "upload">("generate");
@@ -73,6 +76,7 @@ export function AssetGenerationWorkspace({
         columns={columns}
         showPrompt={showPrompt}
         onEditPrompt={(prompt) => setPrefill({ value: prompt, nonce: Date.now() })}
+        onPendingChange={onPendingChange}
       />
     </>
   );

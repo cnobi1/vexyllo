@@ -44,7 +44,7 @@ export default async function VideosPage({ params }: { params: Promise<{ id: str
         .limit(24),
       supabase
         .from("generations")
-        .select("id, kind, type, status, output_url, storage_path, error, created_at")
+        .select("id, kind, type, status, output_url, storage_path, error, created_at, scene_number")
         .eq("project_id", id)
         .in("kind", ["image_to_video", "upload_to_video"])
         .order("created_at", { ascending: false })

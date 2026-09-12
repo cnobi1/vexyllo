@@ -13,6 +13,8 @@ import { ResolutionControl } from "../_components/resolution-control";
 import { ModelSelectControl, pickDefaultModelId, type ModelOption } from "../_components/model-select-control";
 import type { CharacterOption } from "../_components/character-picker";
 import { PromptMentionField, extractMentionedAssetIds, type MentionAssetOption } from "../_components/prompt-mention-field";
+import { useTextLimits } from "@/app/_components/use-text-limits";
+import { useCreditCostSettings } from "@/app/_components/use-credit-cost-settings";
 
 export type Mode = "generate" | "upload" | "video";
 
@@ -67,6 +69,8 @@ export function ImageGenerateForm({
   const [videoRatio, setVideoRatio] = useState("16:9");
   const [videoQuantity, setVideoQuantity] = useState(1);
   const [isGeneratingVideo, startVideoTransition] = useTransition();
+  const limits = useTextLimits();
+  const costSettings = useCreditCostSettings();
 
   function handleVideoModelChange(id: string) {
     setVideoModelId(id);
@@ -230,7 +234,11 @@ export function ImageGenerateForm({
   }
 
   const videoCreditTotal = selectedVideoModel
-    ? computeCreditCost(selectedVideoModel, { durationSeconds: videoDuration, resolution: videoResolution }) * videoQuantity
+    ? computeCreditCost(selectedVideoModel, {
+        durationSeconds: videoDuration,
+        resolution: videoResolution,
+        minVideoCreditCost: costSettings.minVideoCreditCost,
+      }) * videoQuantity
     : 0;
   const imageCreditTotal = selectedModel ? computeCreditCost(selectedModel) * quantity : 0;
 
@@ -298,6 +306,7 @@ export function ImageGenerateForm({
             options={[...uploadMentionOptions, ...imageMentionOptions]}
             mentionStyle="inline"
             placeholder="Describe the motion/action… type @ to reference an uploaded or generated image as the video's source"
+            maxLength={limits.prompt}
           />
           <div className="flex flex-wrap items-center gap-4">
             <ModelSelectControl options={videoModels} value={videoModelId} onChange={handleVideoModelChange} />
@@ -339,6 +348,7 @@ export function ImageGenerateForm({
             options={generateMentionOptions}
             mentionStyle="inline"
             placeholder="Describe the image you want to generate… type @ to reference a character or an image"
+            maxLength={limits.prompt}
           />
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex flex-wrap items-center gap-4">

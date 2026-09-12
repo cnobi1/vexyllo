@@ -8,8 +8,9 @@ import { getScriptProvider } from "@/lib/providers/llm";
 import { extractScriptText } from "@/lib/scripts/extract-script-text";
 import { normalizeScriptText } from "@/lib/scripts/normalize-script-text";
 import { deleteProjectStorage } from "@/lib/media/delete-project-storage";
-import { SCRIPT_CREDIT_COST } from "@/lib/billing/credit-costs";
+import { loadCreditCostSettings } from "@/lib/billing/credit-costs";
 import { requireCredits, recordSpend } from "@/lib/billing/spend-credits";
+import { assertMaxLength, loadTextLimits } from "@/lib/text-limits";
 import { loadOwnedProject } from "./project-guard";
 import { runAction } from "./action-result";
 
@@ -25,6 +26,9 @@ async function createProjectImpl(formData: FormData) {
   const style = rawStyle === CUSTOM_STYLE_VALUE ? String(formData.get("customStyle") ?? "").trim() : rawStyle;
 
   const supabase = await createClient();
+  const limits = await loadTextLimits(supabase);
+  assertMaxLength(title, limits.name, "Title");
+  assertMaxLength(style, limits.short_text, "Style");
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -61,6 +65,8 @@ async function startProjectFromIdeaImpl(formData: FormData) {
   if (!idea) return;
 
   const supabase = await createClient();
+  const limits = await loadTextLimits(supabase);
+  assertMaxLength(idea, limits.idea, "Idea");
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -93,6 +99,9 @@ async function updateProjectImpl(id: string, formData: FormData) {
   if (!title) return;
 
   const supabase = await createClient();
+  const limits = await loadTextLimits(supabase);
+  assertMaxLength(title, limits.name, "Title");
+  assertMaxLength(scriptText, limits.script_text, "Script");
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -129,6 +138,8 @@ async function updateProjectStyleImpl(projectId: string, style: string) {
   if (!user) redirect("/login");
 
   const trimmed = style.trim();
+  const limits = await loadTextLimits(supabase);
+  assertMaxLength(trimmed, limits.short_text, "Style");
   const { error } = await supabase
     .from("projects")
     .update({ style: trimmed || null })
@@ -151,6 +162,8 @@ async function generateScriptFromIdeaImpl(id: string, formData: FormData) {
   const length = formData.get("length") === "feature" ? "feature" : "short";
 
   const supabase = await createClient();
+  const limits = await loadTextLimits(supabase);
+  assertMaxLength(idea, limits.idea, "Idea");
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -165,7 +178,8 @@ async function generateScriptFromIdeaImpl(id: string, formData: FormData) {
     throw new Error(projectError?.message ?? "Project not found");
   }
 
-  await requireCredits(user.id, SCRIPT_CREDIT_COST);
+  const costSettings = await loadCreditCostSettings(supabase);
+  await requireCredits(user.id, costSettings.scriptCreditCost);
 
   const provider = getScriptProvider();
   const result = await provider.generateScript({ idea, style: project.style, length });
@@ -177,7 +191,7 @@ async function generateScriptFromIdeaImpl(id: string, formData: FormData) {
   if (error) {
     throw new Error(error.message);
   }
-  await recordSpend(user.id, SCRIPT_CREDIT_COST, "generation_script", null);
+  await recordSpend(user.id, costSettings.scriptCreditCost, "generation_script", null);
 
   revalidatePath(`/projects/${id}`);
   redirect(`/projects/${id}`);
@@ -193,6 +207,9 @@ async function enhanceScriptFromUploadImpl(id: string, formData: FormData) {
   const instructions = String(formData.get("instructions") ?? "").trim();
 
   const supabase = await createClient();
+  const limits = await loadTextLimits(supabase);
+  assertMaxLength(pastedScript, limits.script_text, "Script");
+  assertMaxLength(instructions, limits.instructions, "Instructions");
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -212,7 +229,8 @@ async function enhanceScriptFromUploadImpl(id: string, formData: FormData) {
     throw new Error(projectError?.message ?? "Project not found");
   }
 
-  await requireCredits(user.id, SCRIPT_CREDIT_COST);
+  const costSettings = await loadCreditCostSettings(supabase);
+  await requireCredits(user.id, costSettings.scriptCreditCost);
 
   const provider = getScriptProvider();
   const result = await provider.enhanceScript({
@@ -232,7 +250,7 @@ async function enhanceScriptFromUploadImpl(id: string, formData: FormData) {
   if (error) {
     throw new Error(error.message);
   }
-  await recordSpend(user.id, SCRIPT_CREDIT_COST, "generation_script", null);
+  await recordSpend(user.id, costSettings.scriptCreditCost, "generation_script", null);
 
   revalidatePath(`/projects/${id}`);
   redirect(`/projects/${id}`);
@@ -247,6 +265,8 @@ async function editScriptWithAIImpl(id: string, formData: FormData) {
   if (!instructions) return;
 
   const supabase = await createClient();
+  const limits = await loadTextLimits(supabase);
+  assertMaxLength(instructions, limits.instructions, "Instructions");
   const {
     data: { user },
   } = await supabase.auth.getUser();
@@ -264,7 +284,8 @@ async function editScriptWithAIImpl(id: string, formData: FormData) {
     throw new Error("Write a script first before editing it with AI.");
   }
 
-  await requireCredits(user.id, SCRIPT_CREDIT_COST);
+  const costSettings = await loadCreditCostSettings(supabase);
+  await requireCredits(user.id, costSettings.scriptCreditCost);
 
   const provider = getScriptProvider();
   const result = await provider.enhanceScript({
@@ -287,7 +308,7 @@ async function editScriptWithAIImpl(id: string, formData: FormData) {
   if (error) {
     throw new Error(error.message);
   }
-  await recordSpend(user.id, SCRIPT_CREDIT_COST, "generation_script", null);
+  await recordSpend(user.id, costSettings.scriptCreditCost, "generation_script", null);
 
   revalidatePath(`/projects/${id}`);
   redirect(`/projects/${id}`);

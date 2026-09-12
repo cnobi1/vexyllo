@@ -12,12 +12,14 @@ export function ScriptEditor({
   defaultValue,
   rows,
   placeholder,
+  maxLength,
 }: {
   id: string;
   name: string;
   defaultValue: string;
   rows: number;
   placeholder: string;
+  maxLength?: number;
 }) {
   const [value, setValue] = useState(defaultValue);
   const backdropRef = useRef<HTMLPreElement>(null);
@@ -52,6 +54,7 @@ export function ScriptEditor({
         name={name}
         rows={rows}
         placeholder={placeholder}
+        maxLength={maxLength}
         value={value}
         onChange={(event: ChangeEvent<HTMLTextAreaElement>) => setValue(event.target.value)}
         onScroll={handleScroll}

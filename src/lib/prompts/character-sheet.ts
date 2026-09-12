@@ -30,6 +30,9 @@ The same person must appear in every panel. Maintain identical facial structure,
 IMPORTANT INDIVIDUALITY:
 Render this as one specific, particular person, not a generic type or stock-photo model for their demographic/role. Where the character description above is broad or archetypal, make concrete, distinctive choices of your own for facial structure, features, and build rather than defaulting to the most average/generic face for that age, gender, and profession — this character must be visually distinguishable from any other character sheet generated for this same production, even one described with similar age, role, or wardrobe.
 
+IMPORTANT SETTING FIDELITY:
+If the character description above specifies or implies a real-world country, region, culture, or ethnicity, render the skin tone, facial features, hair texture/style, and clothing exactly as true to that people and place as the description calls for — do not soften, generalize, or drift toward a default/Western look. Wardrobe, fabric, and styling should match what that culture actually wears, not a costume-y or stereotyped approximation of it.
+
 RENDERING QUALITY:
 Professional film pre-production reference sheet, natural anatomy and proportions, realistic texture and detail appropriate to the visual style, clean neutral studio background, soft even studio lighting, subtle shadows, high-end visual development artwork, extremely detailed, sharp focus, high resolution.
 

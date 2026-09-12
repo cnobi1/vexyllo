@@ -58,6 +58,22 @@ async function startVideoTask(input: GenerateVideoInput): Promise<VideoTaskHandl
   }
 }
 
+// Every "use step" invocation is a message on Vercel's own Queue Service
+// (VQS) underneath Workflow's runtime — that queue tracks its own
+// server-side delivery count entirely separately from this app's logical
+// maxRetries, and that count has a real, non-negotiable ceiling. A real
+// generation (Wan 3.0, scene 18, 2026-09-12) died with "Step exceeded
+// maximum queue deliveries (79/48)" while this step was still using the
+// old maxRetries=100 budget below. Confirmed by reading
+// node_modules/@vercel/queue's source directly: the only redelivery-limit
+// constant there (DEV_REDELIVERY_MAX_ATTEMPTS=10) is local-dev-only: no
+// env var, SDK option, or other app-level knob raises the real production
+// ceiling. So the fix isn't waiting less — it's needing far fewer total
+// deliveries for roughly the same wait budget, via a shorter maxRetries
+// and a longer steady-state poll interval, kept well clear of the ~48
+// ceiling observed in that failure.
+const POLL_MAX_RETRIES = 40;
+
 async function pollVideoTask(
   handle: VideoTaskHandle,
   providerKey: GenerateVideoInput["providerKey"],
@@ -65,13 +81,28 @@ async function pollVideoTask(
   "use step";
   const result = await getVideoProvider(providerKey).pollVideoTask(handle);
   if (result.status === "queued" || result.status === "running") {
-    // Escalating backoff: fast at first (short clips resolve in a couple of
-    // polls), slowing down for long-running jobs so we don't hammer the
-    // API. Throwing here causes Workflow's runtime to reschedule *this
-    // step* itself per retryAfter — no custom sleep loop, and it survives
-    // a server restart mid-poll (unlike an in-memory wait loop would).
     const { attempt } = getStepMetadata();
-    const retryAfter = attempt < 6 ? "5s" : attempt < 26 ? "15s" : "30s";
+    // Give up on our own terms, with a clear and actionable message, one
+    // attempt before Workflow's own maxRetries exhaustion would otherwise
+    // surface this same "Video still queued/running" RetryableError text
+    // as the terminal failure — which reads like a bug report, not
+    // something a customer can act on.
+    if (attempt >= POLL_MAX_RETRIES) {
+      throw new FatalError(
+        "Video generation is taking longer than expected and was stopped after roughly 30 minutes of waiting. The provider may still be processing it behind the scenes, but this app gave up polling — please try generating again.",
+      );
+    }
+    // Escalating backoff: fast at first (short clips resolve in a couple of
+    // polls), then straight to a longer steady interval for jobs that are
+    // genuinely still running. Fewer, longer-spaced polls than before
+    // (was 5s/15s/30s over 100 attempts, ~45min) cover a comparable
+    // ~28-minute wait (6 polls @5s + 10 @20s + 24 @60s) in 40 total
+    // deliveries instead of 100 — see POLL_MAX_RETRIES comment above for why
+    // total delivery count, not wait time, is the thing being budgeted here.
+    // Throwing here causes Workflow's runtime to reschedule *this step*
+    // itself per retryAfter — no custom sleep loop, and it survives a
+    // server restart mid-poll (unlike an in-memory wait loop would).
+    const retryAfter = attempt < 6 ? "5s" : attempt < 16 ? "20s" : "60s";
     throw new RetryableError(`Video still ${result.status}`, { retryAfter });
   }
   if (result.status === "failed" || result.status === "expired" || result.status === "cancelled") {
@@ -79,15 +110,7 @@ async function pollVideoTask(
   }
   return result;
 }
-// Every "use step" function defaults to 3 retries (4 attempts total) unless
-// overridden — fine for a one-shot call, but this step is a poll loop by
-// design and is expected to be re-invoked dozens of times over a video
-// generation that can take several minutes. Left at the default, real
-// generations were being marked "failed" with "Video still running" after
-// ~25s even though BytePlus was still actively working on them. 100 retries
-// against the escalating backoff above works out to roughly 45 minutes of
-// polling headroom before genuinely giving up.
-pollVideoTask.maxRetries = 100;
+pollVideoTask.maxRetries = POLL_MAX_RETRIES;
 
 type Outcome = { status: "succeeded"; url: string; cost: number | null } | { status: "failed"; error: string };
 

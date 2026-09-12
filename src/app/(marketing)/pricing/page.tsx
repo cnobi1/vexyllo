@@ -1,10 +1,17 @@
 import Link from "next/link";
-import { PLANS } from "@/lib/billing/plans";
-import { BILLING_FAQS } from "@/lib/billing/faqs";
+import { createClient } from "@/lib/supabase/server";
+import { loadPlans } from "@/lib/billing/plans";
+import { buildBillingFaqs } from "@/lib/billing/faqs";
+import { loadCreditCostSettings, videoCreditCost } from "@/lib/billing/credit-costs";
 import { HeroImagePlaceholder, ImagePlaceholder } from "../_components/image-placeholder";
 import { PlanCard } from "@/app/_components/plan-card";
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const supabase = await createClient();
+  const [plans, costSettings] = await Promise.all([loadPlans(supabase), loadCreditCostSettings(supabase)]);
+  const creditsPerVideoSecond1080p = videoCreditCost(1, "1080p", costSettings.minVideoCreditCost);
+  const billingFaqs = buildBillingFaqs(creditsPerVideoSecond1080p);
+
   return (
     <div className="flex flex-1 flex-col">
       <section className="relative overflow-hidden">
@@ -26,7 +33,7 @@ export default function PricingPage() {
 
       <section className="mx-auto w-full max-w-5xl px-6 pb-8">
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-3 sm:items-start">
-          {PLANS.map((plan) => {
+          {plans.map((plan) => {
             const isFeatured = plan.id === "pro";
             const isTopTier = plan.id === "studio";
 
@@ -45,6 +52,7 @@ export default function PricingPage() {
                     Get started
                   </Link>
                 }
+                creditsPerVideoSecond1080p={creditsPerVideoSecond1080p}
               />
             );
           })}
@@ -68,7 +76,7 @@ export default function PricingPage() {
       <section className="mx-auto w-full max-w-2xl px-6 pb-24">
         <h2 className="mb-6 text-center text-xl font-semibold text-foreground">Questions</h2>
         <div className="flex flex-col gap-4">
-          {BILLING_FAQS.map((faq) => (
+          {billingFaqs.map((faq) => (
             <div key={faq.question} className="card-glow rounded-2xl p-5">
               <h3 className="text-sm font-semibold text-foreground">{faq.question}</h3>
               <p className="mt-1 text-sm text-muted">{faq.answer}</p>

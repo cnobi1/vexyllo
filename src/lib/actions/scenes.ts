@@ -12,8 +12,9 @@ import {
   MIN_SCENE_DURATION_SECONDS,
   enforceSceneDurationRange,
 } from "@/lib/scripts/enforce-scene-duration-range";
-import { BREAKDOWN_CREDIT_COST } from "@/lib/billing/credit-costs";
+import { loadCreditCostSettings } from "@/lib/billing/credit-costs";
 import { requireCredits, recordSpend } from "@/lib/billing/spend-credits";
+import { assertMaxLength, loadTextLimits } from "@/lib/text-limits";
 import { runAction } from "./action-result";
 
 export async function generateSceneBreakdown(projectId: string, formData: FormData) {
@@ -55,7 +56,8 @@ async function generateSceneBreakdownImpl(projectId: string, formData: FormData)
     .eq("id", projectId);
   if (settingError) throw new Error(settingError.message);
 
-  await requireCredits(user.id, BREAKDOWN_CREDIT_COST);
+  const costSettings = await loadCreditCostSettings(supabase);
+  await requireCredits(user.id, costSettings.breakdownCreditCost);
 
   const provider = getLLMProvider();
 
@@ -213,7 +215,7 @@ async function generateSceneBreakdownImpl(projectId: string, formData: FormData)
     if (sceneAssetsError) throw new Error(sceneAssetsError.message);
   }
 
-  await recordSpend(user.id, BREAKDOWN_CREDIT_COST, "generation_script", null);
+  await recordSpend(user.id, costSettings.breakdownCreditCost, "generation_script", null);
 
   revalidatePath(`/projects/${projectId}`);
   revalidatePath(`/projects/${projectId}/scenes`);
@@ -302,6 +304,106 @@ async function removeSceneAssetImpl(projectId: string, sceneId: string, assetId:
   }
 
   const { error } = await supabase.from("scene_assets").delete().eq("scene_id", sceneId).eq("asset_id", assetId);
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/projects/${projectId}/scenes`);
+}
+
+/**
+ * Manual correction for the AI breakdown's dialogue extraction — lets the
+ * customer fix a line the breakdown got wrong before it's pulled into the
+ * Videos tab's "From scene" mode (see buildSceneContext/formatDialogueLines
+ * in video-generate-form.tsx, which read scenes.dialogue verbatim as the
+ * generation prompt). Empty input clears it back to null (non-verbal scene),
+ * matching how the breakdown itself represents "no dialogue."
+ */
+export async function updateSceneDialogue(projectId: string, sceneId: string, dialogue: string) {
+  return runAction(() => updateSceneDialogueImpl(projectId, sceneId, dialogue));
+}
+
+async function updateSceneDialogueImpl(projectId: string, sceneId: string, dialogue: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", projectId)
+    .single();
+  if (projectError || !project) {
+    throw new Error(projectError?.message ?? "Project not found");
+  }
+
+  const trimmed = dialogue.trim();
+  const limits = await loadTextLimits(supabase);
+  assertMaxLength(trimmed, limits.prompt, "Dialogue");
+  const { error } = await supabase
+    .from("scenes")
+    .update({ dialogue: trimmed || null })
+    .eq("id", sceneId)
+    .eq("project_id", projectId);
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  revalidatePath(`/projects/${projectId}/scenes`);
+}
+
+/**
+ * Manual correction for the AI breakdown's per-character wardrobe note on a
+ * scene_assets row — same rationale as updateSceneDialogue above, just one
+ * level down (per character-in-scene, not per scene). Requires
+ * scene_assets_update_own (20260912152335_add_scene_assets_update_policy.sql)
+ * — the table previously only had select/insert/delete RLS policies, since
+ * SceneAssetEditor only ever added/removed rows, never edited one in place.
+ * Empty input clears it back to null, matching updateSceneDialogue.
+ */
+export async function updateSceneAssetWardrobe(projectId: string, sceneId: string, assetId: string, wardrobeNote: string) {
+  return runAction(() => updateSceneAssetWardrobeImpl(projectId, sceneId, assetId, wardrobeNote));
+}
+
+async function updateSceneAssetWardrobeImpl(projectId: string, sceneId: string, assetId: string, wardrobeNote: string) {
+  const supabase = await createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+
+  const { data: project, error: projectError } = await supabase
+    .from("projects")
+    .select("id")
+    .eq("id", projectId)
+    .single();
+  if (projectError || !project) {
+    throw new Error(projectError?.message ?? "Project not found");
+  }
+
+  // scene_assets_update_own only checks scene_id -> scenes -> projects.user_id,
+  // not that the scene belongs to this specific projectId — verify explicitly,
+  // same reasoning as addSceneAssetImpl above.
+  const { data: scene, error: sceneError } = await supabase
+    .from("scenes")
+    .select("id")
+    .eq("id", sceneId)
+    .eq("project_id", projectId)
+    .single();
+  if (sceneError || !scene) {
+    throw new Error(sceneError?.message ?? "Scene not found");
+  }
+
+  const trimmed = wardrobeNote.trim();
+  const limits = await loadTextLimits(supabase);
+  assertMaxLength(trimmed, limits.note, "Wardrobe note");
+  const { error } = await supabase
+    .from("scene_assets")
+    .update({ wardrobe_note: trimmed || null })
+    .eq("scene_id", sceneId)
+    .eq("asset_id", assetId);
   if (error) {
     throw new Error(error.message);
   }

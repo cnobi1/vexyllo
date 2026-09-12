@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import { extFromContentType } from "@/lib/media/copy-to-storage";
 import { saveShowcaseItems, type PendingShowcaseItem } from "@/lib/actions/showcase";
 import { isActionError } from "@/lib/actions/action-result";
+import { useTextLimits } from "@/app/_components/use-text-limits";
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 const MAX_VIDEO_BYTES = 45 * 1024 * 1024;
@@ -19,6 +20,7 @@ export function ShowcaseForm() {
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, startTransition] = useTransition();
+  const limits = useTextLimits();
 
   function handleFilesSelected(e: ChangeEvent<HTMLInputElement>) {
     const selected = Array.from(e.target.files ?? []);
@@ -150,6 +152,7 @@ export function ShowcaseForm() {
                   onChange={(e) => updatePrompt(index, e.target.value)}
                   placeholder="Prompt used to generate it (optional)"
                   rows={2}
+                  maxLength={limits.description}
                   className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground outline-none focus:border-border-strong"
                 />
                 <button

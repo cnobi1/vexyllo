@@ -22,7 +22,7 @@ export default async function MediaPage({ params }: { params: Promise<{ id: stri
 
   const { data: generations } = await supabase
     .from("generations")
-    .select("id, kind, type, status, output_url, storage_path, error, created_at")
+    .select("id, kind, type, status, output_url, storage_path, error, created_at, scene_number")
     .eq("project_id", id)
     .order("created_at", { ascending: false })
     .limit(60);

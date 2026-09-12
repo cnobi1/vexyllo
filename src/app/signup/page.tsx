@@ -34,7 +34,7 @@ function SignupForm() {
             We&apos;ll start your project from: <span className="text-foreground">&ldquo;{idea}&rdquo;</span>
           </p>
         )}
-        <GoogleAuthButton label="Sign up with Google" />
+        <GoogleAuthButton mode="signup" />
         <div className="flex items-center gap-3">
           <div className="h-px flex-1 bg-border" />
           <span className="text-xs text-muted">or</span>

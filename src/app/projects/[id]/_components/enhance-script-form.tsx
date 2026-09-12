@@ -3,6 +3,7 @@
 import { useRef, useState, type FormEvent } from "react";
 import { enhanceScriptFromUpload } from "@/lib/actions/projects";
 import { useActionForm } from "@/app/_components/use-action-form";
+import { useTextLimits } from "@/app/_components/use-text-limits";
 import { SubmitButton } from "./submit-button";
 
 /**
@@ -19,6 +20,7 @@ export function EnhanceScriptForm({ projectId }: { projectId: string }) {
   const pastedRef = useRef<HTMLTextAreaElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [state, formAction] = useActionForm(enhanceScriptFromUpload.bind(null, projectId));
+  const limits = useTextLimits();
 
   function handleSubmit(event: FormEvent<HTMLFormElement>) {
     const hasFile = (fileRef.current?.files?.length ?? 0) > 0;
@@ -66,6 +68,7 @@ export function EnhanceScriptForm({ projectId }: { projectId: string }) {
           id="pasted_script"
           name="pasted_script"
           rows={8}
+          maxLength={limits.script_text}
           onChange={() => error && setError(null)}
           placeholder="Paste your script text here instead of uploading a file…"
           className="rounded-lg border border-border bg-background/60 px-3 py-2 font-mono text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
@@ -79,6 +82,7 @@ export function EnhanceScriptForm({ projectId }: { projectId: string }) {
           id="instructions"
           name="instructions"
           rows={2}
+          maxLength={limits.instructions}
           placeholder="e.g. Tighten the pacing in Act 2, make the dialogue punchier…"
           className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
         />

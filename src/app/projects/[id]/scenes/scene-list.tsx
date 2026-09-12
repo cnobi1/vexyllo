@@ -2,6 +2,8 @@ import { Fragment } from "react";
 import { isHighlightedScriptLine } from "@/lib/script-highlight";
 import type { CharacterOption } from "../_components/character-picker";
 import { SceneAssetEditor } from "./scene-asset-editor";
+import { SceneAssetWardrobeEditor } from "./scene-asset-wardrobe-editor";
+import { SceneDialogueEditor } from "./scene-dialogue-editor";
 
 type SceneAssetLink = {
   asset_id: string;
@@ -94,7 +96,7 @@ function SceneCard({
       </div>
 
       {scene.summary && <p className="text-sm text-foreground">{scene.summary}</p>}
-      {scene.dialogue && <p className="text-xs italic text-muted">{scene.dialogue}</p>}
+      <SceneDialogueEditor projectId={projectId} sceneId={scene.id} initialDialogue={scene.dialogue} />
 
       {scene.scene_assets.length > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -113,7 +115,14 @@ function SceneCard({
                   ) : null}
                   {asset.name}
                 </div>
-                {link.wardrobe_note && <span className="max-w-[220px] text-muted">{link.wardrobe_note}</span>}
+                {asset.type === "character" && (
+                  <SceneAssetWardrobeEditor
+                    projectId={projectId}
+                    sceneId={scene.id}
+                    assetId={link.asset_id}
+                    initialWardrobeNote={link.wardrobe_note}
+                  />
+                )}
               </div>
             );
           })}

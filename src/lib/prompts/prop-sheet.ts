@@ -19,5 +19,8 @@ BACKGROUND:
 Pure plain white background, no shadows on the background, no gradient, no texture, no props or scenery of any kind behind or around the object.
 
 RENDERING QUALITY:
-Professional studio product photography, soft even studio lighting, subtle contact shadow directly under the object only, sharp focus, high resolution, accurate color and material detail, extremely detailed.`;
+Professional studio product photography, soft even studio lighting, subtle contact shadow directly under the object only, sharp focus, high resolution, accurate color and material detail, extremely detailed.
+
+IMPORTANT SETTING FIDELITY:
+If the prop description above specifies or implies a particular culture, region, or cuisine (e.g. a specific dish, garment, or household item), render it exactly as that item authentically looks — not a generic or approximate substitute.`;
 }
