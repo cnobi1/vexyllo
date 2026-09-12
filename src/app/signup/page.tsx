@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { signup, type AuthState } from "@/lib/actions/auth";
 import { Logo } from "@/app/_components/logo";
-import { GoogleAuthButton } from "@/app/_components/google-auth-button";
+// import { GoogleAuthButton } from "@/app/_components/google-auth-button"; // see note below where it's rendered
 
 export default function SignupPage() {
   return (
@@ -34,12 +34,16 @@ function SignupForm() {
             We&apos;ll start your project from: <span className="text-foreground">&ldquo;{idea}&rdquo;</span>
           </p>
         )}
-        <GoogleAuthButton mode="signup" />
+        {/* Google sign-in temporarily hidden — Client ID isn't whitelisted in
+            Google Cloud Console yet, so the button errors on click. Re-enable
+            by restoring these lines (and the matching block in login/page.tsx)
+            once that's fixed. */}
+        {/* <GoogleAuthButton mode="signup" />
         <div className="flex items-center gap-3">
           <div className="h-px flex-1 bg-border" />
           <span className="text-xs text-muted">or</span>
           <div className="h-px flex-1 bg-border" />
-        </div>
+        </div> */}
         <form action={action} className="flex flex-col gap-4">
           {idea && <input type="hidden" name="idea" value={idea} />}
           <div className="flex flex-col gap-1">

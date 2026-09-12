@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { login, type AuthState } from "@/lib/actions/auth";
 import { Logo } from "@/app/_components/logo";
-import { GoogleAuthButton } from "@/app/_components/google-auth-button";
+// import { GoogleAuthButton } from "@/app/_components/google-auth-button"; // see note below where it's rendered
 
 export default function LoginPage() {
   return (
@@ -30,12 +30,16 @@ function LoginForm() {
         </Link>
         <h1 className="text-xl font-semibold text-foreground">Log in</h1>
         {oauthError && <p className="text-sm text-danger">{oauthError}</p>}
-        <GoogleAuthButton mode="continue" />
+        {/* Google sign-in temporarily hidden — Client ID isn't whitelisted in
+            Google Cloud Console yet, so the button errors on click. Re-enable
+            by restoring these lines (and the matching block in signup/page.tsx)
+            once that's fixed. */}
+        {/* <GoogleAuthButton mode="continue" />
         <div className="flex items-center gap-3">
           <div className="h-px flex-1 bg-border" />
           <span className="text-xs text-muted">or</span>
           <div className="h-px flex-1 bg-border" />
-        </div>
+        </div> */}
         <form action={action} className="flex flex-col gap-4">
           <div className="flex flex-col gap-1">
             <label htmlFor="email" className="text-sm text-muted">
