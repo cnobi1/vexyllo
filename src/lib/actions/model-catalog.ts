@@ -7,16 +7,17 @@ import { requireAdmin } from "./admin-guard";
 import { runAction } from "./action-result";
 
 export interface ModelCatalogInput {
-  capability: "image" | "video";
-  providerKey: "byteplus" | "gateway" | "alibaba" | "mock";
+  capability: "image" | "video" | "audio";
+  providerKey: "byteplus" | "gateway" | "alibaba" | "mock" | "elevenlabs";
   providerModelId: string;
   displayName: string;
   description?: string;
-  creditCostMode: "flat" | "duration_multiplier";
+  creditCostMode: "flat" | "duration_multiplier" | "character_multiplier";
   flatCreditCost?: number | null;
   creditsPerSecond?: number | null;
   resolutionCostMultiplier?: Record<string, number> | null;
   creditsPerReferenceImage?: number | null;
+  creditsPerCharacter?: number | null;
   allowedDurations?: { min: number; max: number } | null;
   allowedResolutions?: string[] | null;
   allowedRatios?: string[] | null;
@@ -38,6 +39,7 @@ function toRow(input: ModelCatalogInput) {
     credits_per_second: input.creditsPerSecond ?? null,
     resolution_cost_multiplier: input.resolutionCostMultiplier ?? null,
     credits_per_reference_image: input.creditsPerReferenceImage ?? null,
+    credits_per_character: input.creditsPerCharacter ?? null,
     allowed_durations: input.allowedDurations ?? null,
     allowed_resolutions: input.allowedResolutions ?? null,
     allowed_ratios: input.allowedRatios ?? null,
@@ -54,6 +56,9 @@ function validateInput(input: ModelCatalogInput, limits: TextLimits) {
   }
   if (input.creditCostMode === "duration_multiplier" && input.creditsPerSecond == null) {
     throw new Error("Duration-priced models need a credits-per-second rate.");
+  }
+  if (input.creditCostMode === "character_multiplier" && input.creditsPerCharacter == null) {
+    throw new Error("Per-character-priced models need a credits-per-character rate.");
   }
   assertMaxLength(input.providerModelId, limits.technical_id, "Provider model id");
   assertMaxLength(input.displayName, limits.name, "Display name");

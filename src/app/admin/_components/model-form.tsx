@@ -8,21 +8,22 @@ export type ModelFormValues = ModelCatalogInput;
 
 const RESOLUTION_KEYS = ["480p", "720p", "1080p", "4k"] as const;
 
-function emptyValues(capability: "image" | "video"): ModelFormValues {
+function emptyValues(capability: "image" | "video" | "audio"): ModelFormValues {
   return {
     capability,
     providerKey: "mock",
     providerModelId: "",
     displayName: "",
     description: "",
-    creditCostMode: capability === "image" ? "flat" : "duration_multiplier",
+    creditCostMode: capability === "image" ? "flat" : capability === "audio" ? "character_multiplier" : "duration_multiplier",
     flatCreditCost: capability === "image" ? 2 : null,
     creditsPerSecond: capability === "video" ? 3 : null,
     resolutionCostMultiplier: null,
     creditsPerReferenceImage: null,
+    creditsPerCharacter: capability === "audio" ? 0.002 : null,
     allowedDurations: capability === "video" ? { min: 2, max: 12 } : null,
     allowedResolutions: capability === "video" ? ["480p", "720p", "1080p"] : null,
-    allowedRatios: ["16:9", "9:16", "1:1"],
+    allowedRatios: capability === "audio" ? null : ["16:9", "9:16", "1:1"],
     supportsImageToVideo: false,
     supportsReferenceImages: false,
     maxReferenceImages: null,
@@ -105,6 +106,7 @@ export function ModelForm({
   }
 
   const isVideo = values.capability === "video";
+  const isAudio = values.capability === "audio";
 
   return (
     <form onSubmit={handleSubmit} className="card-glow flex flex-col gap-4 rounded-2xl p-4">
@@ -113,22 +115,25 @@ export function ModelForm({
           <select
             value={values.capability}
             onChange={(e) => {
-              const capability = e.target.value as "image" | "video";
+              const capability = e.target.value as "image" | "video" | "audio";
               set("capability", capability);
-              set("creditCostMode", capability === "image" ? "flat" : "duration_multiplier");
+              set("creditCostMode", capability === "image" ? "flat" : capability === "audio" ? "character_multiplier" : "duration_multiplier");
+              if (capability === "audio") set("providerKey", "mock");
             }}
             className="input"
           >
             <option value="image">Image</option>
             <option value="video">Video</option>
+            <option value="audio">Audio (voice)</option>
           </select>
         </Field>
         <Field label="Provider">
           <select value={values.providerKey} onChange={(e) => set("providerKey", e.target.value as ModelFormValues["providerKey"])} className="input">
             <option value="mock">Mock</option>
-            <option value="byteplus">BytePlus</option>
-            <option value="gateway">Gateway</option>
+            {!isAudio && <option value="byteplus">BytePlus</option>}
+            {!isAudio && <option value="gateway">Gateway</option>}
             {isVideo && <option value="alibaba">Alibaba (DashScope)</option>}
+            {isAudio && <option value="elevenlabs">ElevenLabs</option>}
           </select>
         </Field>
         <Field label="Provider model id">
@@ -165,6 +170,7 @@ export function ModelForm({
           <select value={values.creditCostMode} onChange={(e) => set("creditCostMode", e.target.value as ModelFormValues["creditCostMode"])} className="input">
             <option value="flat">Flat per generation</option>
             <option value="duration_multiplier">Duration × resolution</option>
+            <option value="character_multiplier">Per character (text-to-speech)</option>
           </select>
         </Field>
         {values.creditCostMode === "flat" ? (
@@ -174,6 +180,16 @@ export function ModelForm({
               step="0.01"
               value={values.flatCreditCost ?? ""}
               onChange={(e) => set("flatCreditCost", e.target.value ? Number(e.target.value) : null)}
+              className="input"
+            />
+          </Field>
+        ) : values.creditCostMode === "character_multiplier" ? (
+          <Field label="Credits per character">
+            <input
+              type="number"
+              step="0.0001"
+              value={values.creditsPerCharacter ?? ""}
+              onChange={(e) => set("creditsPerCharacter", e.target.value ? Number(e.target.value) : null)}
               className="input"
             />
           </Field>
@@ -243,15 +259,17 @@ export function ModelForm({
         </>
       )}
 
-      <Field label="Allowed ratios (comma-separated, blank = any)">
-        <input
-          value={allowedRatiosText}
-          onChange={(e) => setAllowedRatiosText(e.target.value)}
-          placeholder="16:9, 9:16, 1:1"
-          maxLength={limits.description}
-          className="input"
-        />
-      </Field>
+      {!isAudio && (
+        <Field label="Allowed ratios (comma-separated, blank = any)">
+          <input
+            value={allowedRatiosText}
+            onChange={(e) => setAllowedRatiosText(e.target.value)}
+            placeholder="16:9, 9:16, 1:1"
+            maxLength={limits.description}
+            className="input"
+          />
+        </Field>
+      )}
 
       {isVideo && (
         <div className="flex flex-wrap items-center gap-4">

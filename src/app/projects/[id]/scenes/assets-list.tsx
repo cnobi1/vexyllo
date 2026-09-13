@@ -163,18 +163,34 @@ function AssetCard({
         {showGenerate ? "Hide generate" : isGenerating ? "✦ Generate (in progress…)" : "✦ Generate"}
       </button>
 
-      {showGenerate && (
-        <div className="flex flex-col gap-3">
-          <AssetGenerationWorkspace
-            projectId={projectId}
-            assetId={asset.id}
-            initialItems={initialGenerations}
-            columns={2}
-            showPrompt={false}
-            onPendingChange={setIsGenerating}
-          />
+      {/* Kept mounted (just visually collapsed) rather than unmounted when
+          the accordion is closed — same 0fr/1fr grid-collapse trick as
+          CharacterCard's own edit panel. AssetGenerationWorkspace's
+          GenerationFeed is what actually drives isGenerating via
+          onPendingChange below; unmounting it on collapse (the previous
+          behavior) tore down that realtime subscription, so a generation
+          kicked off from elsewhere (the section's "Autofill images" button,
+          or another tab on the same project) never flipped isGenerating on
+          a card whose own accordion happened to be closed — the exact "no
+          sign it's generating" gap that let a user re-click Autofill and pay
+          for a second, redundant generation. */}
+      <div
+        className="grid transition-[grid-template-rows] duration-300 ease-in-out"
+        style={{ gridTemplateRows: showGenerate ? "1fr" : "0fr" }}
+      >
+        <div className="overflow-hidden" inert={!showGenerate}>
+          <div className="flex flex-col gap-3 pt-1">
+            <AssetGenerationWorkspace
+              projectId={projectId}
+              assetId={asset.id}
+              initialItems={initialGenerations}
+              columns={2}
+              showPrompt={false}
+              onPendingChange={setIsGenerating}
+            />
+          </div>
         </div>
-      )}
+      </div>
 
       <form action={saveAction} className="flex flex-col gap-2">
         <input type="hidden" name="name" value={asset.name} />

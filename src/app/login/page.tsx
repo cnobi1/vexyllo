@@ -58,7 +58,7 @@ function LoginForm() {
               <label htmlFor="password" className="text-sm text-muted">
                 Password
               </label>
-              <Link href="/forgot-password" className="text-xs font-medium text-foreground underline underline-offset-2">
+              <Link href="/forgot-password" className="text-xs font-medium text-foreground">
                 Forgot password?
               </Link>
             </div>
@@ -81,7 +81,7 @@ function LoginForm() {
         </form>
         <p className="text-sm text-muted">
           No account?{" "}
-          <Link href="/signup" className="font-medium text-foreground underline underline-offset-2">
+          <Link href="/signup" className="font-medium text-foreground">
             Sign up
           </Link>
         </p>

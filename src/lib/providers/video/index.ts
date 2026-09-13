@@ -21,6 +21,8 @@ export function getVideoProvider(providerKey: GenerateVideoInput["providerKey"])
       return alibabaVideoAdapter;
     case "mock":
       return mockVideoAdapter;
+    case "elevenlabs":
+      throw new Error("ElevenLabs does not have a video generation adapter — this model is misconfigured.");
   }
 }
 

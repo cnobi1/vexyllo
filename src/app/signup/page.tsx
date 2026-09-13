@@ -83,7 +83,7 @@ function SignupForm() {
         </form>
         <p className="text-sm text-muted">
           Already have an account?{" "}
-          <Link href="/login" className="font-medium text-foreground underline underline-offset-2">
+          <Link href="/login" className="font-medium text-foreground">
             Log in
           </Link>
         </p>

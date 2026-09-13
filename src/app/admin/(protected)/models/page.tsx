@@ -4,16 +4,17 @@ import { ModelsTable, type AdminModelRow } from "@/app/admin/_components/models-
 
 type Row = {
   id: string;
-  capability: "image" | "video";
-  provider_key: "byteplus" | "gateway" | "alibaba" | "mock";
+  capability: "image" | "video" | "audio";
+  provider_key: "byteplus" | "gateway" | "alibaba" | "mock" | "elevenlabs";
   provider_model_id: string;
   display_name: string;
   description: string | null;
-  credit_cost_mode: "flat" | "duration_multiplier";
+  credit_cost_mode: "flat" | "duration_multiplier" | "character_multiplier";
   flat_credit_cost: number | null;
   credits_per_second: number | null;
   resolution_cost_multiplier: Record<string, number> | null;
   credits_per_reference_image: number | null;
+  credits_per_character: number | null;
   allowed_durations: { min: number; max: number } | null;
   allowed_resolutions: string[] | null;
   allowed_ratios: string[] | null;
@@ -31,7 +32,7 @@ export default async function AdminModelsPage() {
   const { data, error } = await supabase
     .from("generation_models")
     .select(
-      "id, capability, provider_key, provider_model_id, display_name, description, credit_cost_mode, flat_credit_cost, credits_per_second, resolution_cost_multiplier, credits_per_reference_image, allowed_durations, allowed_resolutions, allowed_ratios, supports_image_to_video, supports_reference_images, max_reference_images, is_active, sort_order",
+      "id, capability, provider_key, provider_model_id, display_name, description, credit_cost_mode, flat_credit_cost, credits_per_second, resolution_cost_multiplier, credits_per_reference_image, credits_per_character, allowed_durations, allowed_resolutions, allowed_ratios, supports_image_to_video, supports_reference_images, max_reference_images, is_active, sort_order",
     )
     .order("capability", { ascending: true })
     .order("sort_order", { ascending: true });
@@ -49,6 +50,7 @@ export default async function AdminModelsPage() {
     creditsPerSecond: row.credits_per_second,
     resolutionCostMultiplier: row.resolution_cost_multiplier,
     creditsPerReferenceImage: row.credits_per_reference_image,
+    creditsPerCharacter: row.credits_per_character,
     allowedDurations: row.allowed_durations,
     allowedResolutions: row.allowed_resolutions,
     allowedRatios: row.allowed_ratios,

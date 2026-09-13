@@ -129,6 +129,40 @@ export async function updateAssetImageLabel(
   revalidatePath(`/projects/${projectId}/characters`);
 }
 
+/**
+ * Assigns (or clears) a character's reusable ElevenLabs voice — the per-
+ * character equivalent of setPrimaryAssetImage, used by the Videos tab's
+ * "Generate voice" action (media.ts:generateDialogueVoice) to know which
+ * voice reads that character's lines. voiceName is cached alongside
+ * voiceId purely for display (so the Characters tab doesn't need a live
+ * ElevenLabs call just to show what's assigned).
+ */
+export async function updateAssetVoice(
+  projectId: string,
+  assetId: string,
+  input: { voiceId: string | null; voiceName: string | null },
+) {
+  return runAction(() => updateAssetVoiceImpl(projectId, assetId, input));
+}
+
+async function updateAssetVoiceImpl(
+  projectId: string,
+  assetId: string,
+  input: { voiceId: string | null; voiceName: string | null },
+) {
+  const supabase = await createClient();
+  await loadOwnedProject(supabase, projectId);
+
+  const { error } = await supabase
+    .from("assets")
+    .update({ elevenlabs_voice_id: input.voiceId, elevenlabs_voice_name: input.voiceName })
+    .eq("id", assetId)
+    .eq("project_id", projectId);
+  if (error) throw new Error(error.message);
+
+  revalidatePath(`/projects/${projectId}/characters`);
+}
+
 export async function setPrimaryAssetImage(projectId: string, assetId: string, assetImageId: string) {
   const supabase = await createClient();
   await loadOwnedProject(supabase, projectId);

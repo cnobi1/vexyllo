@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment, useMemo, useState, useTransition, type ChangeEvent, type FormEvent } from "react";
-import { generateVideoFromImage } from "@/lib/actions/media";
+import { generateVideoFromImage, generateDialogueVoice } from "@/lib/actions/media";
 import { uploadImage } from "@/lib/actions/uploads";
 import { isActionError } from "@/lib/actions/action-result";
 import { computeCreditCost } from "@/lib/billing/credit-costs";
@@ -12,7 +12,12 @@ import { ResolutionControl } from "../_components/resolution-control";
 import { QuantityControl } from "../_components/quantity-control";
 import { ModelSelectControl, pickDefaultModelId, type ModelOption } from "../_components/model-select-control";
 import { GenerationMedia } from "../_components/generation-media";
-import { PromptMentionField, extractMentionedAssetIds, type MentionAssetOption } from "../_components/prompt-mention-field";
+import {
+  PromptMentionField,
+  extractMentionedAssetIds,
+  parseScreenplayTurns,
+  type MentionAssetOption,
+} from "../_components/prompt-mention-field";
 import { useTextLimits } from "@/app/_components/use-text-limits";
 import { useCreditCostSettings } from "@/app/_components/use-credit-cost-settings";
 
@@ -60,13 +65,39 @@ function buildSceneContext(scene: SceneOption, assetOptions: MentionAssetOption[
 const SPEAKER_LABEL = /\b(?=[A-Z][A-Za-z']*(?:\s[A-Z][A-Za-z']*){0,2}:\s)/g;
 
 /**
+ * Splits an already speaker-labeled beat ("MICHAELA: How far to Ibadan?")
+ * into its label and line, matching the label case-insensitively against
+ * this scene's own linked characters. Returns null when there's no
+ * recognizable "NAME: " prefix, the label doesn't match one of this scene's
+ * characters, or there's no line left after the label — never guessed at,
+ * same "never silently substitute" precedent as parseScreenplayTurns.
+ */
+function matchSpeakerLabel(
+  segment: string,
+  characters: { name: string }[],
+): { name: string; line: string } | null {
+  const match = segment.match(/^([A-Z][A-Za-z']*(?:\s[A-Z][A-Za-z']*){0,2}):\s*([\s\S]*)$/);
+  if (!match) return null;
+  const [, label, rest] = match;
+  if (!rest.trim()) return null;
+  const character = characters.find((option) => option.name.trim().toLowerCase() === label.trim().toLowerCase());
+  return character ? { name: character.name, line: rest.trim() } : null;
+}
+
+/**
  * scenes.dialogue is stored as a single flat block (either "line one. / line
  * two." or, depending on the breakdown run, "SPEAKER: line one. SPEAKER:
  * line two." with no separator at all) — dense and hard to scan or edit.
- * Reformats it into one line per beat for the prefilled prompt, without
- * inventing or reassigning any attribution that isn't already in the text.
+ * Reformats it into one line per beat for the prefilled prompt. When a
+ * beat's speaker label matches one of this scene's own linked characters,
+ * it's rewritten as a proper "@NAME" screenplay tag (see
+ * PromptMentionField's mentionStyle="screenplay" / parseScreenplayTurns)
+ * so "Generate voice" works immediately with no manual re-tagging — the
+ * common case, since the breakdown usually does label who's speaking. A
+ * beat whose label doesn't match a known character (or has no label at
+ * all) is left as plain text, exactly as before, never guessed at.
  */
-function formatDialogueLines(dialogue: string): string {
+function formatDialogueLines(dialogue: string, characters: { name: string }[]): string {
   const trimmed = dialogue.trim();
   if (!trimmed) return "";
   if (trimmed.includes(" / ")) {
@@ -80,7 +111,13 @@ function formatDialogueLines(dialogue: string): string {
     .split(SPEAKER_LABEL)
     .map((line) => line.trim())
     .filter(Boolean);
-  return bySpeaker.length > 1 ? bySpeaker.join("\n") : trimmed;
+  if (bySpeaker.length <= 1) return trimmed;
+  return bySpeaker
+    .map((segment) => {
+      const matched = matchSpeakerLabel(segment, characters);
+      return matched ? `@${matched.name.toUpperCase()}\n${matched.line}` : segment;
+    })
+    .join("\n");
 }
 
 function AssetAvatar({ name, imageUrl }: { name: string; imageUrl: string | null }) {
@@ -210,6 +247,31 @@ export function VideoGenerateForm({
     return assetOptions.filter((option) => option.type !== "character" && linkedIds.has(option.id));
   }, [selectedScene, assetOptions]);
 
+  // Ordered per-character dialogue turns, parsed from the same @NAME-tagged
+  // prompt text used for video generation — see parseScreenplayTurns for why
+  // this (not scenes.dialogue) is the source of truth for "who says what".
+  const dialogueTurns = useMemo(() => parseScreenplayTurns(prompt, sceneCharacterOptions), [prompt, sceneCharacterOptions]);
+  const [voicePending, startVoiceTransition] = useTransition();
+  const [voiceError, setVoiceError] = useState<string | null>(null);
+  const [voiceResult, setVoiceResult] = useState<{
+    generatedCount: number;
+    skipped: { characterName: string; reason: string }[];
+  } | null>(null);
+
+  function handleGenerateVoice() {
+    if (!selectedSceneId || dialogueTurns.length === 0) return;
+    setVoiceError(null);
+    setVoiceResult(null);
+    startVoiceTransition(async () => {
+      const result = await generateDialogueVoice(projectId, { sceneId: selectedSceneId, turns: dialogueTurns });
+      if (isActionError(result)) {
+        setVoiceError(result.error);
+        return;
+      }
+      setVoiceResult(result);
+    });
+  }
+
   // BytePlus forces the video's ratio to follow a first-frame image once one
   // is attached, rejecting an explicit ratio outright — for a scene's own
   // storyboard we know exactly which ratio that resolves to (derived from
@@ -268,7 +330,11 @@ export function VideoGenerateForm({
 
   function selectScene(scene: SceneOption) {
     setSelectedSceneId(scene.id);
-    setPrompt(formatDialogueLines(scene.dialogue ?? ""));
+    const linkedCharacterIds = new Set(scene.assets.map((link) => link.asset_id));
+    const sceneCharacters = assetOptions.filter(
+      (option) => option.type === "character" && linkedCharacterIds.has(option.id),
+    );
+    setPrompt(formatDialogueLines(scene.dialogue ?? "", sceneCharacters));
     // Auto-attach the scene's generated storyboard sheet (if any) as the
     // video's first frame — the customer can still remove it and fall back
     // to pure reference-driven generation.
@@ -466,6 +532,41 @@ export function VideoGenerateForm({
             placeholder={"Dialogue for this scene… type @ then a character's name to tag who's speaking, e.g.\n@CHLOE\nSir, they're... inflated."}
             maxLength={limits.prompt}
           />
+          {selectedSceneId && (
+            <div className="flex flex-col gap-2 rounded-lg border border-border bg-background/40 p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                {/* min-w-0 is required here: a flex item with unconstrained
+                    text otherwise refuses to wrap (flexbox's default
+                    min-width: auto keeps it at its full single-line intrinsic
+                    width) and instead overflows the row, clipping the
+                    shrink-0 button next to it down to a sliver ("Generate v"
+                    instead of "Generate voice"). */}
+                <span className="min-w-0 flex-1 text-xs text-muted">
+                  Voice each tagged line above with the speaking character&apos;s assigned ElevenLabs voice — a
+                  separate audio clip per line, not merged into the video. Assign a voice per character on the
+                  Characters tab.
+                </span>
+                <button
+                  type="button"
+                  onClick={handleGenerateVoice}
+                  disabled={voicePending || dialogueTurns.length === 0}
+                  className="shrink-0 rounded-full border border-border px-3 py-1.5 text-xs font-medium text-foreground transition-colors hover:border-border-strong disabled:opacity-50"
+                >
+                  {voicePending ? "Generating voice…" : "Generate voice"}
+                </button>
+              </div>
+              {voiceError && <p className="text-xs text-danger">{voiceError}</p>}
+              {voiceResult && (
+                <p className="text-xs text-muted">
+                  {voiceResult.generatedCount > 0
+                    ? `Generating ${voiceResult.generatedCount} line${voiceResult.generatedCount === 1 ? "" : "s"} — check All Media shortly.`
+                    : "Nothing to generate."}
+                  {voiceResult.skipped.length > 0 &&
+                    ` Skipped: ${voiceResult.skipped.map((s) => `${s.characterName} (${s.reason})`).join(", ")}.`}
+                </p>
+              )}
+            </div>
+          )}
         </>
       ) : (
         <>

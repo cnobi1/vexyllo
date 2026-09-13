@@ -56,6 +56,58 @@ export function extractMentionedAssetIds(prompt: string, options: MentionAssetOp
   return Array.from(matched);
 }
 
+export interface DialogueTurn {
+  assetId: string;
+  characterName: string;
+  line: string;
+  order: number;
+}
+
+/**
+ * Splits screenplay-style dialogue text (the Videos tab's "From scene" mode,
+ * mentionStyle="screenplay" above) into ordered per-character turns: a
+ * "@NAME" alone on its own line starts a new turn, and every following line
+ * up to the next such tag (or the end of the text) is that character's
+ * spoken line. Only options with type === "character" can start a turn —
+ * locations/props can be @-mentioned elsewhere in a prompt but can't
+ * "speak". Text before the first recognized @NAME tag, and any @-tag that
+ * doesn't match a known character, is ignored (not guessed at as dialogue)
+ * — matches this codebase's "never silently substitute" precedent.
+ */
+export function parseScreenplayTurns(prompt: string, options: MentionAssetOption[]): DialogueTurn[] {
+  const characters = options.filter((option) => option.type === "character" && option.name.trim());
+  // Longest name first, same shadowing guard as extractMentionedAssetIds.
+  const sorted = [...characters].sort((a, b) => b.name.length - a.name.length);
+
+  const turns: DialogueTurn[] = [];
+  let current: { assetId: string; characterName: string; lines: string[] } | null = null;
+
+  const flush = () => {
+    if (current && current.lines.some((line) => line.trim())) {
+      turns.push({
+        assetId: current.assetId,
+        characterName: current.characterName,
+        line: current.lines.join(" ").trim(),
+        order: turns.length,
+      });
+    }
+  };
+
+  for (const rawLine of prompt.split("\n")) {
+    const line = rawLine.trim();
+    const match = sorted.find((option) => line.toLowerCase() === `@${option.name}`.toLowerCase());
+    if (match) {
+      flush();
+      current = { assetId: match.id, characterName: match.name, lines: [] };
+      continue;
+    }
+    if (current) current.lines.push(line);
+  }
+  flush();
+
+  return turns;
+}
+
 type MentionState = { open: boolean; query: string; mentionStart: number; activeIndex: number };
 
 const CLOSED: MentionState = { open: false, query: "", mentionStart: -1, activeIndex: 0 };

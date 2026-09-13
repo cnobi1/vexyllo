@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resolveAssetImageUrlMap } from "@/lib/media/asset-references";
+import { listElevenLabsVoices } from "@/lib/providers/audio";
 import { CharacterList } from "./character-list";
 import { CreateCharacterForm } from "./create-character-form";
 
@@ -15,10 +16,14 @@ export default async function CharactersPage({ params }: { params: Promise<{ id:
 
   const { data: characters } = await supabase
     .from("assets")
-    .select("id, name, description, reference_image_url")
+    .select("id, name, description, reference_image_url, elevenlabs_voice_id, elevenlabs_voice_name")
     .eq("project_id", id)
     .eq("type", "character")
     .order("name", { ascending: true });
+
+  // [] when ELEVENLABS_API_KEY isn't configured — see listElevenLabsVoices'
+  // own comment. The picker just shows nothing to assign in that case.
+  const voices = await listElevenLabsVoices();
 
   // Re-signed from asset_images.storage_path rather than trusting
   // reference_image_url, which may be an expired 1h-TTL signed URL
@@ -41,7 +46,7 @@ export default async function CharactersPage({ params }: { params: Promise<{ id:
       <CreateCharacterForm projectId={id} />
 
       {characters && characters.length > 0 ? (
-        <CharacterList projectId={id} characters={characters} imageUrlByAsset={imageUrlByAsset} />
+        <CharacterList projectId={id} characters={characters} imageUrlByAsset={imageUrlByAsset} voices={voices} />
       ) : (
         <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted">
           No characters yet — create one above.

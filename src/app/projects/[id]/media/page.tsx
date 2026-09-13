@@ -9,6 +9,7 @@ const ALL_KINDS = [
   "character_sheet",
   "upload_to_video",
   "scene_storyboard",
+  "dialogue_voice",
 ];
 
 export default async function MediaPage({ params }: { params: Promise<{ id: string }> }) {

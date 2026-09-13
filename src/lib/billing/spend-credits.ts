@@ -42,7 +42,7 @@ export async function requireCredits(userId: string, cost: number): Promise<void
 export async function recordSpend(
   userId: string,
   cost: number,
-  reason: "generation_image" | "generation_video" | "generation_script",
+  reason: "generation_image" | "generation_video" | "generation_script" | "generation_voice",
   generationId: string | null,
 ): Promise<void> {
   const supabase = createServiceClient();

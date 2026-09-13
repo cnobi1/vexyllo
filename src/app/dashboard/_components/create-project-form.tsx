@@ -48,9 +48,15 @@ export function CreateProjectForm() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="card-glow relative mx-auto flex w-full max-w-3xl flex-col gap-3 overflow-hidden rounded-2xl p-6"
+      className="card-glow relative mx-auto flex w-full max-w-3xl flex-col gap-3 rounded-2xl p-6"
     >
-      <div className="card-spotlight" aria-hidden="true" />
+      {/* Clipped separately from the card itself so the glow stays contained
+          to the rounded corners without clipping the Style field's dropdown
+          panel, which is absolutely positioned in the sibling content wrapper
+          below and needs to escape the card's bounds when open. */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+        <div className="card-spotlight" aria-hidden="true" />
+      </div>
       <div className="relative flex flex-col gap-3">
         <h2 className="flex items-center gap-2 text-base font-semibold text-foreground">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/15 text-primary">

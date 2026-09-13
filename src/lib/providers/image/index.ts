@@ -10,7 +10,7 @@ import type { ImageProvider } from "./types";
 // defensive runtime error, not just a type-level guarantee) are what
 // actually keep an image row from ever pointing at Wan, since Wan is
 // video-only.
-export type ImageProviderKey = "byteplus" | "gateway" | "alibaba" | "mock";
+export type ImageProviderKey = "byteplus" | "gateway" | "alibaba" | "mock" | "elevenlabs";
 
 // Per-generation model choice (see generation_models table) replaced the old
 // env-var-priority "first configured key wins" lookup — see video/index.ts
@@ -25,6 +25,8 @@ export function getImageProvider(providerKey: ImageProviderKey): ImageProvider {
       return mockImageAdapter;
     case "alibaba":
       throw new Error("Alibaba does not have an image generation adapter — this model is misconfigured.");
+    case "elevenlabs":
+      throw new Error("ElevenLabs does not have an image generation adapter — this model is misconfigured.");
   }
 }
 

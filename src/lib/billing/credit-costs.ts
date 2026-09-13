@@ -89,6 +89,13 @@ export async function loadCreditCostSettings(
 export const SCRIPT_CREDIT_COST = 2;
 export const BREAKDOWN_CREDIT_COST = 3;
 
+// ElevenLabs bills per input character — unverified placeholder, see the
+// seed migration's own comment (20260913142136_add_dialogue_voice_elevenlabs.sql).
+// Recalibrate against real ElevenLabs billing once available, same as every
+// other pricing constant in this file.
+export const CREDITS_PER_CHARACTER = 0.002;
+export const MIN_VOICE_CREDIT_COST = 1;
+
 // Lower resolutions cost the provider less compute, so picking 480p/720p
 // over the 1080p baseline should lower the credit charge, not just the
 // output size. An unset/unrecognized resolution prices as "1080p" — this
@@ -116,11 +123,13 @@ export function videoCreditCost(durationSeconds: number, resolution?: string, mi
 // IMAGE_CREDIT_COST at every generation-action call site now that cost can
 // vary per model (e.g. Wan 3.0's two tiers price differently from BytePlus).
 export interface GenerationModelPricing {
-  creditCostMode: "flat" | "duration_multiplier";
+  creditCostMode: "flat" | "duration_multiplier" | "character_multiplier";
   flatCreditCost: number | null;
   creditsPerSecond: number | null;
   resolutionCostMultiplier: Record<string, number> | null;
   creditsPerReferenceImage: number | null;
+  /** Optional — only image/video call sites' pricing types need updating for the rest; only the new audio path actually reads this. */
+  creditsPerCharacter?: number | null;
 }
 
 export function computeCreditCost(
@@ -131,6 +140,8 @@ export function computeCreditCost(
     referenceImageCount?: number;
     /** Live value from credit_cost_settings ('min_video_floor') — defaults to the hardcoded constant when a caller doesn't have settings loaded (e.g. hasn't been updated to pass them yet). */
     minVideoCreditCost?: number;
+    /** Input text length — the billing unit for credit_cost_mode 'character_multiplier' (e.g. ElevenLabs voice). */
+    characterCount?: number;
   } = {},
 ): number {
   if (model.creditCostMode === "flat") {
@@ -138,6 +149,10 @@ export function computeCreditCost(
       throw new Error("Model is missing a flat credit cost");
     }
     return model.flatCreditCost;
+  }
+  if (model.creditCostMode === "character_multiplier") {
+    const perCharacter = model.creditsPerCharacter ?? CREDITS_PER_CHARACTER;
+    return Math.max(MIN_VOICE_CREDIT_COST, Math.ceil((opts.characterCount ?? 0) * perCharacter));
   }
   const perSecond = model.creditsPerSecond ?? VIDEO_CREDITS_PER_SECOND;
   const table = model.resolutionCostMultiplier ?? RESOLUTION_COST_MULTIPLIER;

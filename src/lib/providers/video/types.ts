@@ -17,7 +17,7 @@ export interface GenerateVideoInput {
   /** Provider-facing model id string (generation_models.provider_model_id) — which model to call within whichever adapter providerKey selects. */
   modelId: string;
   /** Which adapter to dispatch to (generation_models.provider_key) — resolved server-side from the chosen catalog row, not user-supplied directly. */
-  providerKey: "byteplus" | "gateway" | "alibaba" | "mock";
+  providerKey: "byteplus" | "gateway" | "alibaba" | "mock" | "elevenlabs";
 }
 
 export type VideoTaskStatus = "queued" | "running" | "succeeded" | "failed" | "cancelled" | "expired";

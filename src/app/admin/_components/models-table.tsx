@@ -17,6 +17,7 @@ export function ModelsTable({ models }: { models: AdminModelRow[] }) {
   const byCapability = {
     video: models.filter((m) => m.capability === "video"),
     image: models.filter((m) => m.capability === "image"),
+    audio: models.filter((m) => m.capability === "audio"),
   };
 
   return (
@@ -43,7 +44,7 @@ export function ModelsTable({ models }: { models: AdminModelRow[] }) {
         />
       )}
 
-      {(["video", "image"] as const).map((capability) => (
+      {(["video", "image", "audio"] as const).map((capability) => (
         <div key={capability} className="flex flex-col gap-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-2">{capability}</h2>
           {byCapability[capability].length === 0 ? (
@@ -77,6 +78,7 @@ export function ModelsTable({ models }: { models: AdminModelRow[] }) {
 
 function pricingSummary(model: AdminModelRow): string {
   if (model.creditCostMode === "flat") return `${model.flatCreditCost ?? "?"} credits / generation`;
+  if (model.creditCostMode === "character_multiplier") return `${model.creditsPerCharacter ?? "?"} credits / character`;
   const base = `${model.creditsPerSecond ?? "?"} credits / second`;
   return model.creditsPerReferenceImage
     ? `${base} + ${model.creditsPerReferenceImage} / extra reference image`

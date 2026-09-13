@@ -80,8 +80,17 @@ export function GenerationFeed({
         supabase.realtime.setAuth(data.session.access_token);
       }
 
+      // assetId must be part of the topic too: Supabase's realtime client
+      // keys channels by topic string, so two GenerationFeed instances with
+      // the same projectId/kinds/type but different assetId (e.g. every
+      // Scenes > Assets card, now that each mounts its own feed
+      // unconditionally to track pending state — see assets-list.tsx)
+      // would otherwise collide on one shared channel. The second mount's
+      // `.channel(...)` call would then return the first's already-
+      // subscribed channel, and calling `.on(...)` on it throws "cannot add
+      // postgres_changes callbacks ... after subscribe()".
       const channel = supabase
-        .channel(`generations:${projectId}:${kinds.join(",")}${type ? `:${type}` : ""}`)
+        .channel(`generations:${projectId}:${kinds.join(",")}${type ? `:${type}` : ""}${assetId ? `:${assetId}` : ""}`)
         .on(
           "postgres_changes",
           { event: "*", schema: "public", table: "generations", filter: `project_id=eq.${projectId}` },

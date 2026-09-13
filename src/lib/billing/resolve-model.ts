@@ -3,8 +3,8 @@ import type { GenerationModelPricing } from "./credit-costs";
 
 export interface GenerationModel extends GenerationModelPricing {
   id: string;
-  capability: "image" | "video";
-  providerKey: "byteplus" | "gateway" | "alibaba" | "mock";
+  capability: "image" | "video" | "audio";
+  providerKey: "byteplus" | "gateway" | "alibaba" | "mock" | "elevenlabs";
   providerModelId: string;
   allowedDurations: { min: number; max: number } | null;
   allowedResolutions: string[] | null;
@@ -13,14 +13,15 @@ export interface GenerationModel extends GenerationModelPricing {
 
 type Row = {
   id: string;
-  capability: "image" | "video";
-  provider_key: "byteplus" | "gateway" | "alibaba" | "mock";
+  capability: "image" | "video" | "audio";
+  provider_key: "byteplus" | "gateway" | "alibaba" | "mock" | "elevenlabs";
   provider_model_id: string;
-  credit_cost_mode: "flat" | "duration_multiplier";
+  credit_cost_mode: "flat" | "duration_multiplier" | "character_multiplier";
   flat_credit_cost: number | null;
   credits_per_second: number | null;
   resolution_cost_multiplier: Record<string, number> | null;
   credits_per_reference_image: number | null;
+  credits_per_character: number | null;
   allowed_durations: { min: number; max: number } | null;
   allowed_resolutions: string[] | null;
   allowed_ratios: string[] | null;
@@ -37,6 +38,7 @@ function toModel(row: Row): GenerationModel {
     creditsPerSecond: row.credits_per_second,
     resolutionCostMultiplier: row.resolution_cost_multiplier,
     creditsPerReferenceImage: row.credits_per_reference_image,
+    creditsPerCharacter: row.credits_per_character,
     allowedDurations: row.allowed_durations,
     allowedResolutions: row.allowed_resolutions,
     allowedRatios: row.allowed_ratios,
@@ -56,12 +58,12 @@ function toModel(row: Row): GenerationModel {
  */
 export async function loadDefaultActiveModel(
   supabase: Awaited<ReturnType<typeof createClient>>,
-  capability: "image" | "video",
+  capability: "image" | "video" | "audio",
 ): Promise<GenerationModel> {
   const { data, error } = await supabase
     .from("generation_models")
     .select(
-      "id, capability, provider_key, provider_model_id, credit_cost_mode, flat_credit_cost, credits_per_second, resolution_cost_multiplier, credits_per_reference_image, allowed_durations, allowed_resolutions, allowed_ratios",
+      "id, capability, provider_key, provider_model_id, credit_cost_mode, flat_credit_cost, credits_per_second, resolution_cost_multiplier, credits_per_reference_image, credits_per_character, allowed_durations, allowed_resolutions, allowed_ratios",
     )
     .eq("capability", capability)
     .eq("is_active", true)
@@ -136,12 +138,12 @@ export async function loadModelOptions(
 export async function loadActiveModel(
   supabase: Awaited<ReturnType<typeof createClient>>,
   modelId: string,
-  capability: "image" | "video",
+  capability: "image" | "video" | "audio",
 ): Promise<GenerationModel> {
   const { data, error } = await supabase
     .from("generation_models")
     .select(
-      "id, capability, provider_key, provider_model_id, credit_cost_mode, flat_credit_cost, credits_per_second, resolution_cost_multiplier, credits_per_reference_image, allowed_durations, allowed_resolutions, allowed_ratios",
+      "id, capability, provider_key, provider_model_id, credit_cost_mode, flat_credit_cost, credits_per_second, resolution_cost_multiplier, credits_per_reference_image, credits_per_character, allowed_durations, allowed_resolutions, allowed_ratios",
     )
     .eq("id", modelId)
     .eq("capability", capability)

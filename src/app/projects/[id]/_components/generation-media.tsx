@@ -58,6 +58,11 @@ export function GenerationMedia({
     return <video src={src} controls className="mt-2 w-full rounded-lg border border-border" />;
   }
 
+  const isAudio = type === "audio" || src.startsWith("data:audio/");
+  if (isAudio) {
+    return <audio src={src} controls className="mt-2 w-full" />;
+  }
+
   return (
     <>
       {/* eslint-disable-next-line @next/next/no-img-element -- generated media are signed Storage URLs / data URIs, not next/image-optimizable remote assets */}

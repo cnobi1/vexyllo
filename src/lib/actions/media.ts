@@ -5,6 +5,7 @@ import { start } from "workflow/api";
 import { createClient } from "@/lib/supabase/server";
 import { getImageProvider } from "@/lib/providers/image";
 import { getVideoProvider } from "@/lib/providers/video";
+import { getAudioProvider } from "@/lib/providers/audio";
 import type { GenerateVideoInput } from "@/lib/providers/video";
 import { copyToMediaBucket } from "@/lib/media/copy-to-storage";
 import { resolveAssetReferenceUrls } from "@/lib/media/asset-references";
@@ -353,7 +354,30 @@ async function autofillAssetImagesImpl(projectId: string, type: string) {
     .eq("project_id", projectId)
     .eq("type", type);
 
-  const targets = (assets ?? []).filter((asset) => !asset.reference_image_url);
+  const candidates = (assets ?? []).filter((asset) => !asset.reference_image_url);
+  if (candidates.length === 0) return;
+
+  // Guard against a repeated click (or a second browser tab) re-autofilling
+  // the same asset while its first generation is still running in the
+  // background — generateCharacterSheetImpl's actual provider call happens
+  // inside an after() callback, well after this action has already
+  // returned, so reference_image_url is still null for both requests and
+  // "missing a reference image" alone can't distinguish a genuinely untried
+  // asset from one already mid-generation. Without this, a repeat click
+  // would silently start (and pay for) a second, redundant generation per
+  // asset instead of a no-op.
+  const { data: pending } = await supabase
+    .from("generations")
+    .select("asset_id")
+    .eq("project_id", projectId)
+    .eq("kind", "character_sheet")
+    .eq("status", "pending")
+    .in(
+      "asset_id",
+      candidates.map((asset) => asset.id),
+    );
+  const pendingAssetIds = new Set((pending ?? []).map((row) => row.asset_id));
+  const targets = candidates.filter((asset) => !pendingAssetIds.has(asset.id));
 
   // No model-picker UI on this bulk action — generateCharacterSheetImpl falls
   // through to the catalog's own default (lowest sort_order active image
@@ -516,6 +540,145 @@ async function generateVideoFromImageImpl(
 
     await supabase.from("generations").update({ workflow_run_id: run.runId }).eq("id", row.id);
   }
+}
+
+export interface DialogueVoiceTurn {
+  assetId: string;
+  characterName: string;
+  line: string;
+  order: number;
+}
+
+export interface DialogueVoiceSkip {
+  characterName: string;
+  reason: string;
+}
+
+/**
+ * Voices character dialogue via ElevenLabs — one generations row per spoken
+ * line (kind='dialogue_voice', type='audio'), sharing a batch_id, scene-
+ * scoped like scene_storyboard. `turns` comes from the client's
+ * parseScreenplayTurns (prompt-mention-field.tsx), which splits the Videos
+ * tab's "From scene" @NAME-tagged dialogue text into ordered per-character
+ * lines — the one place a human actually confirms who's speaking (see the
+ * approved plan; scenes.dialogue itself is an unattributed flat blob, not a
+ * source of truth for this). assetId is re-validated against this project's
+ * own character assets server-side, never trusted as-is from the client.
+ *
+ * A separate audio clip per line, not muxed into any video file — v1 scope,
+ * see the plan. Turns whose character can't be resolved, or has no
+ * elevenlabs_voice_id assigned, are skipped and reported back rather than
+ * silently substituted with a fallback voice or dropped without explanation.
+ */
+export async function generateDialogueVoice(projectId: string, input: { sceneId: string; turns: DialogueVoiceTurn[] }) {
+  return runAction(() => generateDialogueVoiceImpl(projectId, input));
+}
+
+async function generateDialogueVoiceImpl(
+  projectId: string,
+  input: { sceneId: string; turns: DialogueVoiceTurn[] },
+): Promise<{ batchId: string | null; generatedCount: number; skipped: DialogueVoiceSkip[] }> {
+  const supabase = await createClient();
+  const project = await loadOwnedProject(supabase, projectId);
+
+  const { data: scene, error: sceneError } = await supabase
+    .from("scenes")
+    .select("id")
+    .eq("id", input.sceneId)
+    .eq("project_id", projectId)
+    .single();
+  if (sceneError || !scene) {
+    throw new Error(sceneError?.message ?? "Scene not found");
+  }
+
+  const voiceableTurns = input.turns.filter((turn) => turn.line.trim());
+  if (voiceableTurns.length === 0) {
+    return { batchId: null, generatedCount: 0, skipped: [] };
+  }
+
+  // Re-look-up each speaking character (scoped to this project) rather than
+  // trusting the client's assetId/characterName pairing beyond using the id
+  // to find a row we actually own — an unrecognized or voiceless character
+  // is skipped, not silently defaulted to some other voice.
+  const assetIds = Array.from(new Set(voiceableTurns.map((turn) => turn.assetId)));
+  const { data: characterRows } = await supabase
+    .from("assets")
+    .select("id, elevenlabs_voice_id")
+    .eq("project_id", projectId)
+    .eq("type", "character")
+    .in("id", assetIds);
+  const characterById = new Map((characterRows ?? []).map((row) => [row.id, row]));
+
+  const skipped: DialogueVoiceSkip[] = [];
+  const voiced: { turn: DialogueVoiceTurn; voiceId: string }[] = [];
+  for (const turn of voiceableTurns) {
+    const character = characterById.get(turn.assetId);
+    if (!character) {
+      skipped.push({ characterName: turn.characterName, reason: "not a recognized character in this project" });
+    } else if (!character.elevenlabs_voice_id) {
+      skipped.push({ characterName: turn.characterName, reason: "no voice assigned — assign one on the Characters tab" });
+    } else {
+      voiced.push({ turn, voiceId: character.elevenlabs_voice_id });
+    }
+  }
+
+  if (voiced.length === 0) {
+    return { batchId: null, generatedCount: 0, skipped };
+  }
+
+  const model = await loadDefaultActiveModel(supabase, "audio");
+  const provider = getAudioProvider(model.providerKey);
+
+  const totalCharacterCount = voiced.reduce((sum, v) => sum + v.turn.line.length, 0);
+  await requireCredits(project.userId, computeCreditCost(model, { characterCount: totalCharacterCount }));
+
+  const batchId = crypto.randomUUID();
+  const { data: rows, error: insertError } = await supabase
+    .from("generations")
+    .insert(
+      voiced.map(({ turn, voiceId }) => ({
+        project_id: projectId,
+        scene_id: input.sceneId,
+        asset_id: turn.assetId,
+        kind: "dialogue_voice",
+        type: "audio",
+        status: "pending",
+        provider: provider.name,
+        model: model.providerModelId,
+        batch_id: batchId,
+        // "prompt" (not "text") deliberately matches the key every other
+        // kind's params already uses — MediaGrid/GenerationFeed's prompt
+        // caption display is keyed on params.prompt, and reusing it here
+        // means the dialogue line shows under the audio player with no
+        // further UI plumbing needed.
+        params: { prompt: turn.line, voiceId, characterName: turn.characterName, order: turn.order },
+      })),
+    )
+    .select("id, params");
+  if (insertError || !rows) throw new Error(insertError?.message ?? "Failed to start voice generation");
+
+  after(async () => {
+    const worker = await createClient();
+    for (const row of rows) {
+      const params = row.params as { prompt: string; voiceId: string };
+      try {
+        const result = await withTransientRetry(() =>
+          provider.generateSpeech({ text: params.prompt, voiceId: params.voiceId, modelId: model.providerModelId }),
+        );
+        const copied = await copyToMediaBucket(worker, projectId, "generations", row.id, result.url);
+        const rowCreditCost = computeCreditCost(model, { characterCount: result.characterCount });
+        await worker
+          .from("generations")
+          .update({ status: "succeeded", output_url: copied.signedUrl, storage_path: copied.path })
+          .eq("id", row.id);
+        await recordSpend(project.userId, rowCreditCost, "generation_voice", row.id);
+      } catch (err) {
+        await worker.from("generations").update({ status: "failed", error: errorMessage(err) }).eq("id", row.id);
+      }
+    }
+  });
+
+  return { batchId, generatedCount: voiced.length, skipped };
 }
 
 /**
