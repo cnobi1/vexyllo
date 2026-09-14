@@ -42,6 +42,15 @@ export interface VideoTaskResult {
   cost?: number | null;
   /** Present only when status is "failed" or "expired". */
   errorMessage?: string;
+  /**
+   * Set by the workflow's pollVideoTask step (not by adapters) when `url`
+   * came back as an inline `data:` URI and had to be eagerly copied into our
+   * Storage bucket right there, before it could cross another step boundary
+   * as a plain argument — see the size-limit comment in
+   * src/lib/workflows/generate-video.ts. When present, persistOutcome skips
+   * its own copyToMediaBucket call and reuses this path directly.
+   */
+  storagePath?: string;
 }
 
 export interface VideoProvider {

@@ -77,9 +77,26 @@ const POLL_MAX_RETRIES = 40;
 async function pollVideoTask(
   handle: VideoTaskHandle,
   providerKey: GenerateVideoInput["providerKey"],
+  projectId: string,
+  generationId: string,
 ): Promise<VideoTaskResult> {
   "use step";
   const result = await getVideoProvider(providerKey).pollVideoTask(handle);
+  if (result.status === "succeeded" && result.url?.startsWith("data:")) {
+    // Blocking adapters (gateway/mock) resolve with the full media embedded
+    // as a base64 data: URI. That string cannot be allowed to cross another
+    // step boundary as a plain argument/return value: Workflow's steps are
+    // messages on Vercel's Queue Service, which enforces a real max message
+    // size, and a real generated video's base64 blew past it trying to
+    // reach persistOutcome ("The object exceeded the maximum allowed size",
+    // failing deterministically on every retry). Fetching/uploading here
+    // happens inside this step's own execution, which isn't size-limited —
+    // only what travels between steps is — so copy to Storage now and hand
+    // downstream steps just the small signed URL.
+    const supabase = createServiceClient();
+    const copied = await copyToMediaBucket(supabase, projectId, "generations", generationId, result.url);
+    return { ...result, url: copied.signedUrl, storagePath: copied.path };
+  }
   if (result.status === "queued" || result.status === "running") {
     const { attempt } = getStepMetadata();
     // Give up on our own terms, with a clear and actionable message, one
@@ -112,7 +129,9 @@ async function pollVideoTask(
 }
 pollVideoTask.maxRetries = POLL_MAX_RETRIES;
 
-type Outcome = { status: "succeeded"; url: string; cost: number | null } | { status: "failed"; error: string };
+type Outcome =
+  | { status: "succeeded"; url: string; cost: number | null; storagePath?: string }
+  | { status: "failed"; error: string };
 
 async function persistOutcome(
   generationId: string,
@@ -130,8 +149,12 @@ async function persistOutcome(
   if (outcome.status === "succeeded") {
     // BytePlus (and any other provider) URLs are not ours to keep alive —
     // copy into our own bucket before recording success. See
-    // src/lib/media/copy-to-storage.ts.
-    const copied = await copyToMediaBucket(supabase, projectId, "generations", generationId, outcome.url);
+    // src/lib/media/copy-to-storage.ts. When pollVideoTask already did this
+    // eagerly (outcome.storagePath set — see its size-limit comment), reuse
+    // that instead of fetching/uploading the same media a second time.
+    const copied = outcome.storagePath
+      ? { path: outcome.storagePath, signedUrl: outcome.url }
+      : await copyToMediaBucket(supabase, projectId, "generations", generationId, outcome.url);
     await supabase
       .from("generations")
       .update({ status: "succeeded", output_url: copied.signedUrl, storage_path: copied.path, cost: outcome.cost })
@@ -167,7 +190,7 @@ export async function generateVideoWorkflow(
   "use workflow";
   try {
     const handle = await startVideoTask(input);
-    const result = await pollVideoTask(handle, input.providerKey);
+    const result = await pollVideoTask(handle, input.providerKey, projectId, generationId);
     if (result.status !== "succeeded" || !result.url) {
       throw new Error("Video task resolved without a URL");
     }
@@ -175,6 +198,7 @@ export async function generateVideoWorkflow(
       status: "succeeded",
       url: result.url,
       cost: result.cost ?? null,
+      storagePath: result.storagePath,
     });
   } catch (err) {
     await persistOutcome(generationId, projectId, shotId, userId, creditCost, {
