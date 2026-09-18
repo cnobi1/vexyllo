@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { extFromContentType } from "@/lib/media/copy-to-storage";
+import { invalidateSignedUrl } from "@/lib/media/signed-url-cache";
 import { MAX_UPLOAD_BYTES } from "@/lib/media/upload-limits";
 import { loadOwnedProject } from "./project-guard";
 import { runAction } from "./action-result";
@@ -89,6 +90,7 @@ async function deleteUploadImpl(projectId: string, uploadId: string) {
   }
 
   await supabase.storage.from("media").remove([upload.storage_path]);
+  invalidateSignedUrl("media", upload.storage_path);
 
   revalidatePath(`/projects/${projectId}/images`);
 }

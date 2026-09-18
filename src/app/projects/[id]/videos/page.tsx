@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resolveAssetImageUrlMap } from "@/lib/media/asset-references";
+import { getCachedSignedUrl } from "@/lib/media/signed-url-cache";
 import { loadModelOptions } from "@/lib/billing/resolve-model";
 import { VideoGenerateForm } from "./video-generate-form";
 import { GenerationFeed } from "../_components/generation-feed";
@@ -89,8 +90,8 @@ export default async function VideosPage({ params }: { params: Promise<{ id: str
           if (storyboard.output_url) sceneStoryboardUrls[sceneId] = storyboard.output_url;
           return;
         }
-        const { data: signed } = await supabase.storage.from("media").createSignedUrl(storyboard.storage_path, 60 * 60);
-        const url = signed?.signedUrl ?? storyboard.output_url;
+        const signedUrl = await getCachedSignedUrl(supabase, "media", storyboard.storage_path, 60 * 60);
+        const url = signedUrl ?? storyboard.output_url;
         if (url) sceneStoryboardUrls[sceneId] = url;
       }),
     );
@@ -98,8 +99,8 @@ export default async function VideosPage({ params }: { params: Promise<{ id: str
 
   const signedUploads = await Promise.all(
     (uploads ?? []).map(async (upload) => {
-      const { data: signed } = await supabase.storage.from("media").createSignedUrl(upload.storage_path, 60 * 60);
-      return { id: upload.id, url: signed?.signedUrl ?? null };
+      const url = await getCachedSignedUrl(supabase, "media", upload.storage_path, 60 * 60);
+      return { id: upload.id, url };
     }),
   );
 
@@ -108,10 +109,8 @@ export default async function VideosPage({ params }: { params: Promise<{ id: str
   const signedSourceImages = await Promise.all(
     (sourceImages ?? []).map(async (generation) => {
       if (!generation.storage_path) return { id: generation.id, url: generation.output_url };
-      const { data: signed } = await supabase.storage
-        .from("media")
-        .createSignedUrl(generation.storage_path, 60 * 60);
-      return { id: generation.id, url: signed?.signedUrl ?? generation.output_url };
+      const signedUrl = await getCachedSignedUrl(supabase, "media", generation.storage_path, 60 * 60);
+      return { id: generation.id, url: signedUrl ?? generation.output_url };
     }),
   );
 

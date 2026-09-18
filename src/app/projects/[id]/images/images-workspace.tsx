@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getCachedSignedUrl } from "@/lib/media/signed-url-cache";
 import { ImageGenerateForm, type Mode, type MediaMentionOption } from "./image-generate-form";
 import { GenerationFeed } from "../_components/generation-feed";
 import type { CharacterOption } from "../_components/character-picker";
@@ -64,14 +65,12 @@ export function ImagesWorkspace({
     const supabase = createClient();
     Promise.all(
       succeeded.map(async (item, index) => {
-        const { data: signed } = await supabase.storage
-          .from("media")
-          .createSignedUrl(item.storage_path as string, SIGNED_URL_TTL_SECONDS);
+        const signedUrl = await getCachedSignedUrl(supabase, "media", item.storage_path as string, SIGNED_URL_TTL_SECONDS);
         return {
           id: item.id,
           name: `Image ${succeeded.length - index}`,
           type: "image",
-          referenceImageUrl: signed?.signedUrl ?? null,
+          referenceImageUrl: signedUrl,
           storagePath: item.storage_path as string,
         } satisfies MediaMentionOption;
       }),
@@ -122,9 +121,7 @@ export function ImagesWorkspace({
               | { id: string; kind: string; status: string; storage_path: string | null }
               | undefined;
             if (!row || row.kind !== "freeform_image" || row.status !== "succeeded" || !row.storage_path) return;
-            const { data: signed } = await supabase.storage
-              .from("media")
-              .createSignedUrl(row.storage_path, SIGNED_URL_TTL_SECONDS);
+            const signedUrl = await getCachedSignedUrl(supabase, "media", row.storage_path, SIGNED_URL_TTL_SECONDS);
             if (cancelled) return;
             setImageMentionOptions((prev) => {
               if (prev.some((option) => option.id === row.id)) return prev;
@@ -132,7 +129,7 @@ export function ImagesWorkspace({
                 id: row.id,
                 name: `Image ${prev.length + 1}`,
                 type: "image",
-                referenceImageUrl: signed?.signedUrl ?? null,
+                referenceImageUrl: signedUrl,
                 storagePath: row.storage_path,
               };
               return [next, ...prev];

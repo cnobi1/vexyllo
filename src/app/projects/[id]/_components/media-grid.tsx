@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { getCachedSignedUrl } from "@/lib/media/signed-url-cache";
 import { StatusPill } from "./status-pill";
 import { GenerationMedia } from "./generation-media";
 
@@ -38,8 +39,8 @@ function extensionForMime(mime: string, type: string): string {
 async function downloadItem(item: MediaGridItem) {
   let url = item.output_url;
   if (item.storage_path) {
-    const { data } = await createClient().storage.from("media").createSignedUrl(item.storage_path, SIGNED_URL_TTL_SECONDS);
-    if (data) url = data.signedUrl;
+    const signedUrl = await getCachedSignedUrl(createClient(), "media", item.storage_path, SIGNED_URL_TTL_SECONDS);
+    if (signedUrl) url = signedUrl;
   }
   if (!url) return;
 

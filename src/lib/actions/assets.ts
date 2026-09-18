@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { extFromContentType } from "@/lib/media/copy-to-storage";
+import { invalidateSignedUrl } from "@/lib/media/signed-url-cache";
 import { MAX_UPLOAD_BYTES } from "@/lib/media/upload-limits";
 import { assertMaxLength, loadTextLimits } from "@/lib/text-limits";
 import { loadOwnedProject } from "./project-guard";
@@ -91,6 +92,7 @@ async function deleteAssetImpl(projectId: string, assetId: string) {
   const paths = (images ?? []).map((image) => image.storage_path);
   if (paths.length > 0) {
     await supabase.storage.from("media").remove(paths);
+    for (const path of paths) invalidateSignedUrl("media", path);
   }
 
   revalidatePath(`/projects/${projectId}/characters`);
@@ -272,6 +274,7 @@ async function uploadAssetImageImpl(
   if (previousPrimary && !previousPrimary.generation_id) {
     await supabase.from("asset_images").delete().eq("id", previousPrimary.id);
     await supabase.storage.from("media").remove([previousPrimary.storage_path]);
+    invalidateSignedUrl("media", previousPrimary.storage_path);
   }
 
   revalidatePath(`/projects/${projectId}/scenes`);

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { getCachedSignedUrl } from "./signed-url-cache";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
@@ -71,9 +72,9 @@ export async function resolveAssetReferenceUrls(
   if (pathByAsset.size === 0) return undefined;
 
   const signed = await Promise.all(
-    [...pathByAsset.values()].map((path) => supabase.storage.from("media").createSignedUrl(path, SIGNED_URL_TTL_SECONDS)),
+    [...pathByAsset.values()].map((path) => getCachedSignedUrl(supabase, "media", path, SIGNED_URL_TTL_SECONDS)),
   );
-  const urls = signed.map((result) => result.data?.signedUrl).filter((url): url is string => Boolean(url));
+  const urls = signed.filter((url): url is string => Boolean(url));
   return urls.length > 0 ? urls : undefined;
 }
 
@@ -103,11 +104,11 @@ export async function resolveAssetImageVariants(
 
   const variantsByAsset: Record<string, { id: string; label: string | null; url: string | null; isPrimary: boolean }[]> = {};
   for (const image of images ?? []) {
-    const { data: signed } = await supabase.storage.from("media").createSignedUrl(image.storage_path, SIGNED_URL_TTL_SECONDS);
+    const signedUrl = await getCachedSignedUrl(supabase, "media", image.storage_path, SIGNED_URL_TTL_SECONDS);
     (variantsByAsset[image.asset_id] ??= []).push({
       id: image.id,
       label: image.label,
-      url: signed?.signedUrl ?? null,
+      url: signedUrl,
       isPrimary: image.is_primary,
     });
   }
@@ -123,8 +124,8 @@ export async function resolveAssetImageUrlMap(
   const pathByAsset = await resolveAssetImagePaths(supabase, projectId, assetIds);
   const entries = await Promise.all(
     [...pathByAsset.entries()].map(async ([assetId, path]) => {
-      const { data } = await supabase.storage.from("media").createSignedUrl(path, SIGNED_URL_TTL_SECONDS);
-      return data?.signedUrl ? ([assetId, data.signedUrl] as const) : null;
+      const signedUrl = await getCachedSignedUrl(supabase, "media", path, SIGNED_URL_TTL_SECONDS);
+      return signedUrl ? ([assetId, signedUrl] as const) : null;
     }),
   );
   return Object.fromEntries(entries.filter((entry): entry is readonly [string, string] => entry !== null));

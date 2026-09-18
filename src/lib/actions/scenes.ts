@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { NoOutputGeneratedError } from "ai";
 import { createClient } from "@/lib/supabase/server";
+import { invalidateSignedUrl } from "@/lib/media/signed-url-cache";
 import { getLLMProvider } from "@/lib/providers/llm";
 import type { BreakdownAsset, BreakdownScene } from "@/lib/providers/llm/types";
 import { chunkScriptForBreakdown } from "@/lib/scripts/chunk-script-for-breakdown";
@@ -174,6 +175,7 @@ async function generateSceneBreakdownImpl(projectId: string, formData: FormData)
     const stalePaths = (staleImages ?? []).map((image) => image.storage_path);
     if (stalePaths.length > 0) {
       await supabase.storage.from("media").remove(stalePaths);
+      for (const path of stalePaths) invalidateSignedUrl("media", path);
     }
   }
 

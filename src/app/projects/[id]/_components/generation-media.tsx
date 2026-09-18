@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { getCachedSignedUrl } from "@/lib/media/signed-url-cache";
 
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 
@@ -25,13 +26,10 @@ export function GenerationMedia({
   useEffect(() => {
     if (!storagePath) return;
     let cancelled = false;
-    createClient()
-      .storage.from("media")
-      .createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS)
-      .then(({ data, error }) => {
-        if (cancelled || error || !data) return;
-        setSrc(data.signedUrl);
-      });
+    getCachedSignedUrl(createClient(), "media", storagePath, SIGNED_URL_TTL_SECONDS).then((signedUrl) => {
+      if (cancelled || !signedUrl) return;
+      setSrc(signedUrl);
+    });
     return () => {
       cancelled = true;
     };

@@ -9,6 +9,7 @@ import { getAudioProvider } from "@/lib/providers/audio";
 import type { GenerateVideoInput } from "@/lib/providers/video";
 import { copyToMediaBucket } from "@/lib/media/copy-to-storage";
 import { resolveAssetReferenceUrls } from "@/lib/media/asset-references";
+import { invalidateSignedUrl } from "@/lib/media/signed-url-cache";
 import { generateVideoWorkflow } from "@/lib/workflows/generate-video";
 import { buildCharacterSheetPrompt } from "@/lib/prompts/character-sheet";
 import { buildPropSheetPrompt } from "@/lib/prompts/prop-sheet";
@@ -712,5 +713,6 @@ async function deleteGenerationImpl(projectId: string, generationId: string) {
 
   if (generation.storage_path) {
     await supabase.storage.from("media").remove([generation.storage_path]);
+    invalidateSignedUrl("media", generation.storage_path);
   }
 }

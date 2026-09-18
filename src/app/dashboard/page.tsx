@@ -1,6 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { createClient } from "@/lib/supabase/server";
+import { getCachedSignedUrl } from "@/lib/media/signed-url-cache";
 import { formatRelativeDate } from "@/lib/format-relative-date";
 import { DeleteProjectButton } from "../_components/delete-project-button";
 import { Logo } from "../_components/logo";
@@ -62,8 +63,8 @@ export default async function DashboardPage() {
   const thumbnailByProject = new Map<string, string>();
   await Promise.all(
     [...latestStoragePathByProject.entries()].map(async ([projectId, storagePath]) => {
-      const { data } = await supabase.storage.from("media").createSignedUrl(storagePath, SIGNED_URL_TTL_SECONDS);
-      if (data) thumbnailByProject.set(projectId, data.signedUrl);
+      const url = await getCachedSignedUrl(supabase, "media", storagePath, SIGNED_URL_TTL_SECONDS);
+      if (url) thumbnailByProject.set(projectId, url);
     }),
   );
 

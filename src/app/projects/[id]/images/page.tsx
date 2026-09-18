@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { resolveAssetImageUrlMap } from "@/lib/media/asset-references";
+import { getCachedSignedUrl } from "@/lib/media/signed-url-cache";
 import { loadModelOptions } from "@/lib/billing/resolve-model";
 import { ImagesWorkspace } from "./images-workspace";
 import { DeleteUploadButton } from "./delete-upload-button";
@@ -48,8 +49,8 @@ export default async function ImagesPage({ params }: { params: Promise<{ id: str
 
   const signedUploads = await Promise.all(
     (uploads ?? []).map(async (upload) => {
-      const { data: signed } = await supabase.storage.from("media").createSignedUrl(upload.storage_path, 60 * 60);
-      return { ...upload, url: signed?.signedUrl ?? null };
+      const url = await getCachedSignedUrl(supabase, "media", upload.storage_path, 60 * 60);
+      return { ...upload, url };
     }),
   );
 
