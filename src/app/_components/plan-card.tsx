@@ -15,12 +15,15 @@ export function PlanCard({
   cta,
   featuredBadge = true,
   creditsPerVideoSecond1080p = videoCreditCost(1, "1080p"),
+  features = [],
 }: {
   plan: Plan;
   cta: ReactNode;
   featuredBadge?: boolean;
   /** Live value from credit_cost_settings ('min_video_floor') — see faqs.ts's buildBillingFaqs for the same reasoning. Defaults to the hardcoded constant if a caller hasn't loaded live settings. */
   creditsPerVideoSecond1080p?: number;
+  /** Admin-managed pricing-card bullets from loadPlanFeatures (plans.ts) — appended after the computed credit/usage bullets below. */
+  features?: string[];
 }) {
   const approxImages = Math.floor(plan.monthlyCredits / IMAGE_CREDIT_COST);
   const approxVideoSeconds = Math.floor(plan.monthlyCredits / creditsPerVideoSecond1080p);
@@ -60,10 +63,12 @@ export function PlanCard({
             <CheckIcon />
             <span>~{approxVideoSeconds}s of 1080p video/month</span>
           </li>
-          <li className="flex items-center gap-2.5">
-            <CheckIcon />
-            <span>Credits roll over, never expire</span>
-          </li>
+          {features.map((feature) => (
+            <li key={feature} className="flex items-center gap-2.5">
+              <CheckIcon />
+              <span>{feature}</span>
+            </li>
+          ))}
         </ul>
         {cta}
       </div>

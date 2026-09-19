@@ -3,19 +3,30 @@ import { requireAdmin } from "@/lib/actions/admin-guard";
 import { PlanCreditsTable, type PlanCreditsRow } from "@/app/admin/_components/plan-credits-table";
 import { CreditCostSettingsTable, type CreditCostSettingRow } from "@/app/admin/_components/credit-cost-settings-table";
 import { SubscriptionActivity, type SubscriptionActivityRow } from "@/app/admin/_components/subscription-activity";
+import { PlanFeaturesTable, type PlanFeatureRow } from "@/app/admin/_components/plan-features-table";
 
 export default async function AdminSubscriptionsPage() {
   const supabase = await createClient();
   await requireAdmin(supabase);
 
-  const [{ data: plans, error: plansError }, { data: costSettings, error: costError }, { data: subscriptions }] =
-    await Promise.all([
-      supabase.from("subscription_plans").select("id, name, monthly_credits").order("monthly_credits", { ascending: true }),
-      supabase.from("credit_cost_settings").select("key, label, credits").order("key", { ascending: true }),
-      supabase.from("subscriptions").select("plan, status, credit_balance"),
-    ]);
+  const [
+    { data: plans, error: plansError },
+    { data: costSettings, error: costError },
+    { data: subscriptions },
+    { data: planFeatures, error: featuresError },
+  ] = await Promise.all([
+    supabase.from("subscription_plans").select("id, name, monthly_credits").order("monthly_credits", { ascending: true }),
+    supabase.from("credit_cost_settings").select("key, label, credits").order("key", { ascending: true }),
+    supabase.from("subscriptions").select("plan, status, credit_balance"),
+    supabase
+      .from("subscription_plan_features")
+      .select("id, plan_id, label, sort_order")
+      .order("plan_id", { ascending: true })
+      .order("sort_order", { ascending: true }),
+  ]);
   if (plansError) throw new Error(plansError.message);
   if (costError) throw new Error(costError.message);
+  if (featuresError) throw new Error(featuresError.message);
 
   const planRows: PlanCreditsRow[] = (plans ?? []).map((row) => ({
     id: row.id,
@@ -33,6 +44,13 @@ export default async function AdminSubscriptionsPage() {
     plan: row.plan,
     status: row.status,
     creditBalance: row.credit_balance,
+  }));
+
+  const featureRows: PlanFeatureRow[] = (planFeatures ?? []).map((row) => ({
+    id: row.id,
+    planId: row.plan_id,
+    label: row.label,
+    sortOrder: row.sort_order,
   }));
 
   return (
@@ -58,6 +76,17 @@ export default async function AdminSubscriptionsPage() {
             </p>
           </div>
           <PlanCreditsTable plans={planRows} />
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <div>
+            <h2 className="text-sm font-semibold text-foreground">Pricing card bullets per plan</h2>
+            <p className="text-xs text-muted-2">
+              What each plan card shows on /pricing and /billing, below the credit count and computed
+              images/video estimates. Add, edit, or remove bullets per plan — order is low to high.
+            </p>
+          </div>
+          <PlanFeaturesTable features={featureRows} plans={planRows} />
         </section>
 
         <section className="flex flex-col gap-3">

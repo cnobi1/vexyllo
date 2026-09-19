@@ -3,7 +3,7 @@ import Image from "next/image";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getBillingProvider } from "@/lib/providers/billing";
-import { loadPlans, isPlanId } from "@/lib/billing/plans";
+import { loadPlans, loadPlanFeatures, isPlanId } from "@/lib/billing/plans";
 import { TOPUP_PACKS } from "@/lib/billing/topup-packs";
 import { buildBillingFaqs } from "@/lib/billing/faqs";
 import { loadCreditCostSettings, videoCreditCost } from "@/lib/billing/credit-costs";
@@ -41,7 +41,11 @@ export default async function BillingPage({
   const isDemo = provider.name === "mock";
   const currentPlanId = subscription && isPlanId(subscription.plan) ? subscription.plan : null;
 
-  const [plans, costSettings] = await Promise.all([loadPlans(supabase), loadCreditCostSettings(supabase)]);
+  const [plans, costSettings, planFeatures] = await Promise.all([
+    loadPlans(supabase),
+    loadCreditCostSettings(supabase),
+    loadPlanFeatures(supabase),
+  ]);
   const creditsPerVideoSecond1080p = videoCreditCost(1, "1080p", costSettings.minVideoCreditCost);
   const billingFaqs = buildBillingFaqs(creditsPerVideoSecond1080p);
 
@@ -178,6 +182,7 @@ export default async function BillingPage({
                   plan={plan}
                   cta={<SubscribeButton planId={plan.id} isCurrent={currentPlanId === plan.id} variant={variant} />}
                   creditsPerVideoSecond1080p={creditsPerVideoSecond1080p}
+                  features={planFeatures[plan.id]}
                 />
               );
             })}

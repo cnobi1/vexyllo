@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { assertMaxLength, loadTextLimits } from "@/lib/text-limits";
+import { isPlanId } from "@/lib/billing/plans";
 import { requireAdmin } from "./admin-guard";
 import { runAction } from "./action-result";
 
@@ -47,6 +49,73 @@ async function updateCreditCostSettingImpl(key: string, credits: number) {
   await requireAdmin(supabase);
 
   const { error } = await supabase.from("credit_cost_settings").update({ credits }).eq("key", key);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/subscriptions");
+  revalidatePath("/billing");
+  revalidatePath("/pricing");
+}
+
+// Unlike the two fixed-row-set tables above, subscription_plan_features has
+// full insert/update/delete admin policies (see the
+// add_subscription_plan_features migration) — an admin adds and removes
+// arbitrary pricing-card bullets per plan, not just retunes a fixed set.
+
+export async function createPlanFeature(planId: string, label: string, sortOrder: number) {
+  return runAction(() => createPlanFeatureImpl(planId, label, sortOrder));
+}
+
+async function createPlanFeatureImpl(planId: string, label: string, sortOrder: number) {
+  if (!isPlanId(planId)) throw new Error("Unknown plan.");
+  const trimmed = label.trim();
+  if (!trimmed) throw new Error("Feature text is required.");
+
+  const supabase = await createClient();
+  await requireAdmin(supabase);
+  assertMaxLength(trimmed, (await loadTextLimits(supabase)).short_text, "Feature");
+
+  const { error } = await supabase
+    .from("subscription_plan_features")
+    .insert({ plan_id: planId, label: trimmed, sort_order: sortOrder });
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/subscriptions");
+  revalidatePath("/billing");
+  revalidatePath("/pricing");
+}
+
+export async function updatePlanFeature(id: string, label: string, sortOrder: number) {
+  return runAction(() => updatePlanFeatureImpl(id, label, sortOrder));
+}
+
+async function updatePlanFeatureImpl(id: string, label: string, sortOrder: number) {
+  const trimmed = label.trim();
+  if (!trimmed) throw new Error("Feature text is required.");
+
+  const supabase = await createClient();
+  await requireAdmin(supabase);
+  assertMaxLength(trimmed, (await loadTextLimits(supabase)).short_text, "Feature");
+
+  const { error } = await supabase
+    .from("subscription_plan_features")
+    .update({ label: trimmed, sort_order: sortOrder })
+    .eq("id", id);
+  if (error) throw new Error(error.message);
+
+  revalidatePath("/admin/subscriptions");
+  revalidatePath("/billing");
+  revalidatePath("/pricing");
+}
+
+export async function deletePlanFeature(id: string) {
+  return runAction(() => deletePlanFeatureImpl(id));
+}
+
+async function deletePlanFeatureImpl(id: string) {
+  const supabase = await createClient();
+  await requireAdmin(supabase);
+
+  const { error } = await supabase.from("subscription_plan_features").delete().eq("id", id);
   if (error) throw new Error(error.message);
 
   revalidatePath("/admin/subscriptions");

@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
-import { loadPlans } from "@/lib/billing/plans";
+import { loadPlans, loadPlanFeatures } from "@/lib/billing/plans";
 import { buildBillingFaqs } from "@/lib/billing/faqs";
 import { loadCreditCostSettings, videoCreditCost } from "@/lib/billing/credit-costs";
 import { HeroImagePlaceholder, ImagePlaceholder } from "../_components/image-placeholder";
@@ -8,7 +8,11 @@ import { PlanCard } from "@/app/_components/plan-card";
 
 export default async function PricingPage() {
   const supabase = await createClient();
-  const [plans, costSettings] = await Promise.all([loadPlans(supabase), loadCreditCostSettings(supabase)]);
+  const [plans, costSettings, planFeatures] = await Promise.all([
+    loadPlans(supabase),
+    loadCreditCostSettings(supabase),
+    loadPlanFeatures(supabase),
+  ]);
   const creditsPerVideoSecond1080p = videoCreditCost(1, "1080p", costSettings.minVideoCreditCost);
   const billingFaqs = buildBillingFaqs(creditsPerVideoSecond1080p);
 
@@ -53,6 +57,7 @@ export default async function PricingPage() {
                   </Link>
                 }
                 creditsPerVideoSecond1080p={creditsPerVideoSecond1080p}
+                features={planFeatures[plan.id]}
               />
             );
           })}

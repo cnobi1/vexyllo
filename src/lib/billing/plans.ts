@@ -61,3 +61,28 @@ export async function loadPlan(supabase: Awaited<ReturnType<typeof createClient>
   const { data } = await supabase.from("subscription_plans").select("monthly_credits").eq("id", id).maybeSingle();
   return data ? { ...plan, monthlyCredits: data.monthly_credits } : plan;
 }
+
+/**
+ * Qualitative pricing-card bullets ("Priority rendering", etc), admin-edited
+ * at /admin/subscriptions — see the add_subscription_plan_features
+ * migration. Kept separate from Plan/loadPlans (rather than a `features`
+ * field on Plan itself) since PlanCard's other bullets (credit count, ~
+ * images/month, ~video seconds/month) are computed from live credit-cost
+ * math, not stored text — mixing the two would invite an admin to type a
+ * number that drifts from what a plan actually grants.
+ */
+export async function loadPlanFeatures(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<Record<PlanId, string[]>> {
+  const { data } = await supabase
+    .from("subscription_plan_features")
+    .select("plan_id, label")
+    .order("plan_id", { ascending: true })
+    .order("sort_order", { ascending: true });
+
+  const byPlan: Record<PlanId, string[]> = { starter: [], pro: [], studio: [] };
+  for (const row of data ?? []) {
+    if (isPlanId(row.plan_id)) byPlan[row.plan_id].push(row.label);
+  }
+  return byPlan;
+}
