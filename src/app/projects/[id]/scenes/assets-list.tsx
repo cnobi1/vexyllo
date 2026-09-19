@@ -12,6 +12,7 @@ import { ZoomableImage } from "../_components/zoomable-image";
 import { useAssetPrimaryImage } from "../_components/use-asset-primary-image";
 import type { MediaGridItem } from "../_components/media-grid";
 import { useTextLimits } from "@/app/_components/use-text-limits";
+import type { ModelOption } from "../_components/model-select-control";
 
 const SECTION_ORDER = ["character", "location", "prop"] as const;
 const SECTION_LABEL: Record<string, string> = { character: "Characters", location: "Locations", prop: "Props" };
@@ -44,11 +45,13 @@ export function AssetsList({
   assets,
   imageUrlByAsset,
   generationsByAsset,
+  imageModels,
 }: {
   projectId: string;
   assets: Asset[];
   imageUrlByAsset: Record<string, string>;
   generationsByAsset: Record<string, Generation[]>;
+  imageModels: ModelOption[];
 }) {
   const groups = SECTION_ORDER.map((type) => ({
     type,
@@ -71,6 +74,7 @@ export function AssetsList({
                 asset={asset}
                 imageUrl={imageUrlByAsset[asset.id] ?? null}
                 initialGenerations={generationsByAsset[asset.id] ?? []}
+                imageModels={imageModels}
               />
             ))}
           </ul>
@@ -102,11 +106,13 @@ function AssetCard({
   asset,
   imageUrl: initialImageUrl,
   initialGenerations,
+  imageModels,
 }: {
   projectId: string;
   asset: Asset;
   imageUrl: string | null;
   initialGenerations: Generation[];
+  imageModels: ModelOption[];
 }) {
   const [description, setDescription] = useState(asset.description ?? "");
   const [showGenerate, setShowGenerate] = useState(false);
@@ -187,6 +193,7 @@ function AssetCard({
               columns={2}
               showPrompt={false}
               onPendingChange={setIsGenerating}
+              imageModels={imageModels}
             />
           </div>
         </div>

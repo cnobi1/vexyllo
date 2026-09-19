@@ -4,11 +4,12 @@ import { useState, useSyncExternalStore, useTransition, type FormEvent } from "r
 import { generateCharacterSheet } from "@/lib/actions/media";
 import { updateAssetVoice } from "@/lib/actions/assets";
 import { isActionError } from "@/lib/actions/action-result";
-import { IMAGE_CREDIT_COST } from "@/lib/billing/credit-costs";
+import { computeCreditCost } from "@/lib/billing/credit-costs";
 import { DeleteAssetButton } from "../_components/delete-asset-button";
 import { ExpandableTextarea } from "../_components/expandable-textarea";
 import { ZoomableImage } from "../_components/zoomable-image";
 import { useAssetPrimaryImage } from "../_components/use-asset-primary-image";
+import { ModelSelectControl, pickDefaultModelId, type ModelOption } from "../_components/model-select-control";
 
 type Character = {
   id: string;
@@ -158,12 +159,14 @@ export function CharacterList({
   characters,
   imageUrlByAsset,
   voices,
+  imageModels,
 }: {
   projectId: string;
   characters: Character[];
   imageUrlByAsset: Record<string, string>;
   /** ElevenLabs voices available to pick from — [] when ELEVENLABS_API_KEY isn't configured. */
   voices: VoiceOption[];
+  imageModels: ModelOption[];
 }) {
   return (
     <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
@@ -174,6 +177,7 @@ export function CharacterList({
           character={character}
           imageUrl={imageUrlByAsset[character.id] ?? null}
           voices={voices}
+          imageModels={imageModels}
         />
       ))}
     </ul>
@@ -185,11 +189,13 @@ function CharacterCard({
   character,
   imageUrl: initialImageUrl,
   voices,
+  imageModels,
 }: {
   projectId: string;
   character: Character;
   imageUrl: string | null;
   voices: VoiceOption[];
+  imageModels: ModelOption[];
 }) {
   const [editing, setEditing] = useState(false);
   const imageUrl = useAssetPrimaryImage(projectId, character.id, initialImageUrl);
@@ -231,7 +237,12 @@ function CharacterCard({
           unclickable, since a 0fr row hides it visually but not from the DOM. */}
       <div className="grid transition-[grid-template-rows] duration-300 ease-in-out" style={{ gridTemplateRows: editing ? "1fr" : "0fr" }}>
         <div className="overflow-hidden" inert={!editing}>
-          <RegenerateForm projectId={projectId} assetId={character.id} initialPrompt={character.description ?? ""} />
+          <RegenerateForm
+            projectId={projectId}
+            assetId={character.id}
+            initialPrompt={character.description ?? ""}
+            imageModels={imageModels}
+          />
         </div>
       </div>
     </li>
@@ -404,14 +415,20 @@ function RegenerateForm({
   projectId,
   assetId,
   initialPrompt,
+  imageModels,
 }: {
   projectId: string;
   assetId: string;
   initialPrompt: string;
+  imageModels: ModelOption[];
 }) {
   const [prompt, setPrompt] = useState(initialPrompt);
+  const [modelId, setModelId] = useState(pickDefaultModelId(imageModels));
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+
+  const selectedModel = imageModels.find((m) => m.id === modelId);
+  const creditCost = selectedModel ? computeCreditCost(selectedModel) : 0;
 
   function handleSubmit(event: FormEvent) {
     event.preventDefault();
@@ -421,7 +438,7 @@ function RegenerateForm({
       // Character sheets default to 16:9, matching Scenes > Assets — a
       // fixed storyboard-panel aspect, not user-configurable here (no
       // ratio control in this form).
-      const result = await generateCharacterSheet(projectId, assetId, { prompt, quantity: 1, ratio: "16:9" });
+      const result = await generateCharacterSheet(projectId, assetId, { prompt, quantity: 1, ratio: "16:9", modelId });
       if (isActionError(result)) {
         setError(result.error);
       }
@@ -431,9 +448,10 @@ function RegenerateForm({
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3 pt-1">
       <ExpandableTextarea value={prompt} onChange={setPrompt} placeholder="Describe its appearance…" />
+      {imageModels.length > 1 && <ModelSelectControl options={imageModels} value={modelId} onChange={setModelId} />}
       <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-muted">
-          {IMAGE_CREDIT_COST} credit{(IMAGE_CREDIT_COST as number) === 1 ? "" : "s"}
+          {creditCost} credit{creditCost === 1 ? "" : "s"}
         </span>
         <button
           type="submit"

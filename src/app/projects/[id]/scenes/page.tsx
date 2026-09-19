@@ -6,6 +6,7 @@ import { SceneList } from "./scene-list";
 import { SceneTabs } from "./scene-tabs";
 import { AssetsList } from "./assets-list";
 import { resolveAssetImageUrlMap } from "@/lib/media/asset-references";
+import { loadModelOptions } from "@/lib/billing/resolve-model";
 import type { CharacterOption } from "../_components/character-picker";
 
 export default async function ScenesPage({
@@ -81,6 +82,8 @@ export default async function ScenesPage({
 
   const hasScenes = Boolean(scenes && scenes.length > 0);
 
+  const imageModels = await loadModelOptions(supabase, "image");
+
   return (
     <main className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-8 px-6 py-10">
       {hasScript ? (
@@ -114,6 +117,7 @@ export default async function ScenesPage({
               assets={assets}
               imageUrlByAsset={imageUrlByAsset}
               generationsByAsset={generationsByAsset}
+              imageModels={imageModels}
             />
           ) : (
             <p className="rounded-2xl border border-dashed border-border p-6 text-center text-sm text-muted">

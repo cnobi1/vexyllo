@@ -5,6 +5,7 @@ import { AssetGenerateForm } from "./asset-generate-form";
 import { AssetUploadForm } from "./asset-upload-form";
 import { GenerationFeed } from "./generation-feed";
 import type { MediaGridItem } from "./media-grid";
+import type { ModelOption } from "./model-select-control";
 
 /**
  * Lifts prompt-prefill state above the generate form and the feed (siblings
@@ -23,6 +24,7 @@ export function AssetGenerationWorkspace({
   columns,
   showPrompt,
   onPendingChange,
+  imageModels,
 }: {
   projectId: string;
   assetId: string;
@@ -32,6 +34,7 @@ export function AssetGenerationWorkspace({
   showPrompt?: boolean;
   /** Passed straight through to GenerationFeed — lets a caller (e.g. AssetsList's card) show a generating indicator on the asset's main image, outside this workspace's own collapsed accordion. */
   onPendingChange?: (hasPending: boolean) => void;
+  imageModels: ModelOption[];
 }) {
   const [prefill, setPrefill] = useState<{ value: string; nonce: number } | null>(null);
   const [mode, setMode] = useState<"generate" | "upload">("generate");
@@ -63,7 +66,7 @@ export function AssetGenerationWorkspace({
         </button>
       </div>
       {mode === "generate" ? (
-        <AssetGenerateForm projectId={projectId} assetId={assetId} prefill={prefill} />
+        <AssetGenerateForm projectId={projectId} assetId={assetId} prefill={prefill} imageModels={imageModels} />
       ) : (
         <AssetUploadForm projectId={projectId} assetId={assetId} />
       )}

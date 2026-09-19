@@ -3,27 +3,34 @@
 import { useEffect, useRef, useState, useTransition, type FormEvent } from "react";
 import { generateCharacterSheet } from "@/lib/actions/media";
 import { isActionError } from "@/lib/actions/action-result";
-import { IMAGE_CREDIT_COST } from "@/lib/billing/credit-costs";
+import { computeCreditCost } from "@/lib/billing/credit-costs";
 import { useTextLimits } from "@/app/_components/use-text-limits";
 import { QuantityControl } from "./quantity-control";
+import { ModelSelectControl, pickDefaultModelId, type ModelOption } from "./model-select-control";
 
 export function AssetGenerateForm({
   projectId,
   assetId,
   prefill,
+  imageModels,
 }: {
   projectId: string;
   assetId: string;
   /** Set (with a fresh `nonce`) to prefill the prompt from an existing generation's "Edit & regenerate". */
   prefill?: { value: string; nonce: number } | null;
+  imageModels: ModelOption[];
 }) {
   const [prompt, setPrompt] = useState("");
   const [quantity, setQuantity] = useState(1);
+  const [modelId, setModelId] = useState(pickDefaultModelId(imageModels));
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [appliedNonce, setAppliedNonce] = useState(prefill?.nonce);
   const limits = useTextLimits();
+
+  const selectedModel = imageModels.find((m) => m.id === modelId);
+  const creditCost = selectedModel ? computeCreditCost(selectedModel) : 0;
 
   // Adjusting state in response to a prop change is done during render (React's
   // recommended pattern), not in an effect — the effect below only drives the
@@ -47,7 +54,7 @@ export function AssetGenerateForm({
       // Scenes > Assets reference boards default to 16:9 — a fixed
       // storyboard-panel aspect, not user-configurable here (no ratio
       // control in this form).
-      const result = await generateCharacterSheet(projectId, assetId, { prompt, quantity, ratio: "16:9" });
+      const result = await generateCharacterSheet(projectId, assetId, { prompt, quantity, ratio: "16:9", modelId });
       if (isActionError(result)) {
         setError(result.error);
         return;
@@ -68,11 +75,12 @@ export function AssetGenerateForm({
         maxLength={limits.prompt}
         className="rounded-lg border border-border bg-background/60 px-3 py-2 text-sm text-foreground placeholder:text-muted-2 outline-none focus:border-border-strong"
       />
+      {imageModels.length > 1 && <ModelSelectControl options={imageModels} value={modelId} onChange={setModelId} />}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <QuantityControl value={quantity} onChange={setQuantity} />
         <div className="flex items-center gap-2">
           <span className="text-xs text-muted">
-            {quantity * IMAGE_CREDIT_COST} credit{quantity * IMAGE_CREDIT_COST === 1 ? "" : "s"}
+            {quantity * creditCost} credit{quantity * creditCost === 1 ? "" : "s"}
           </span>
           <button
             type="submit"
